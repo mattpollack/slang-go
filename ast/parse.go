@@ -243,7 +243,6 @@ func (p *parser) ConsumeIfNext(kind int) bool {
 }
 
 func (p *parser) Identifier() (Expression, error) {
-
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		return NewIdentifier(p.Next().value)
 	}

@@ -2,7 +2,7 @@ package main
 
 import (
 	"./ast"
-	"./bytecode"
+	"./compile"
 
 	"fmt"
 	"time"
@@ -35,5 +35,5 @@ let rec = {
 
 	fmt.Println("\n---------------------------------------\n")
 
-	bytecode.Compile(prog)
+	compile.Compile(prog)
 }

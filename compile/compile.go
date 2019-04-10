@@ -1,4 +1,4 @@
-package bytecode
+package compile
 
 import (
 	"../ast"
@@ -67,13 +67,13 @@ func visitExpr(e ast.Expression) {
 		for i, group := range node.Matches {
 			for _, match := range group {
 				if i != 0 {
-					fmt.Printf("%s_%d:\n", node.MetaGet().(Meta).name, i)
+					fmt.Printf("%s_%d:\n", node.MetaGet().(*Meta).name, i)
 				}
 
 				visitMatch(match)
 
 				if i < len(node.Matches)-1 {
-					fmt.Printf("  jne %s_%d\n", node.MetaGet().(Meta).name, i+1)
+					fmt.Printf("  jne %s_%d\n", node.MetaGet().(*Meta).name, i+1)
 				} else {
 					fmt.Printf("  jne __RUNTIME_ERROR\n")
 				}
@@ -108,9 +108,8 @@ func visitExpr(e ast.Expression) {
 		fmt.Println()
 
 		for i, e := range node.BoundValues {
-			meta := e.MetaGet().(Meta)
+			meta := e.MetaGet().(*Meta)
 			meta.name = node.BoundIds[i].Value
-			e = e.MetaSet(meta).(ast.Expression) // Value doesn't need to be set???
 
 			fmt.Printf("%s:\n", meta.name)
 			visitExpr(e)

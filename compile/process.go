@@ -1,8 +1,44 @@
-package bytecode
+package compile
 
 import (
 	"../ast"
 )
+
+// --------------------------------------------------------
+
+type BoundValue struct {
+	Index int
+
+	meta interface{}
+}
+
+func (e BoundValue) IsExpression() {}
+
+func NewBoundValue(s int) BoundValue {
+	return BoundValue{
+		s,
+		nil,
+	}
+}
+
+func (A BoundValue) EqualsExpr(b ast.Expression) bool {
+	switch B := b.(type) {
+	case BoundValue:
+		return A.Index == B.Index
+	}
+
+	return false
+}
+
+func (e BoundValue) MetaGet() interface{} {
+	return e.meta
+}
+
+func (e BoundValue) MetaSet(meta interface{}) interface{} {
+	e.meta = meta
+
+	return e
+}
 
 // --------------------------------------------------------
 
@@ -59,46 +95,10 @@ func Replace(in ast.Expression, replace ast.Expression, with ast.Expression) ast
 
 // --------------------------------------------------------
 
-type BoundValue struct {
-	Index int
-
-	meta interface{}
-}
-
-func (e BoundValue) IsExpression() {}
-
-func NewBoundValue(s int) BoundValue {
-	return BoundValue{
-		s,
-		nil,
-	}
-}
-
-func (A BoundValue) EqualsExpr(b ast.Expression) bool {
-	switch B := b.(type) {
-	case BoundValue:
-		return A.Index == B.Index
-	}
-
-	return false
-}
-
-func (e BoundValue) MetaGet() interface{} {
-	return e.meta
-}
-
-func (e BoundValue) MetaSet(meta interface{}) interface{} {
-	e.meta = meta
-
-	return e
-}
-
-// --------------------------------------------------------
-
 func pass0(e ast.Expression) ast.Expression {
-	// NOTE: small hack since all other interface methods are copy operations
+	// Set default meta information
 	e = e.MetaSet(
-		Meta{
+		&Meta{
 			name: "__NO_NAME",
 		},
 	).(ast.Expression)
@@ -112,7 +112,6 @@ func pass0(e ast.Expression) ast.Expression {
 	case ast.Pattern:
 		// Closure conversion
 		// Move all nested closures to a top level let block with auto generated names
-
 		// Replace pattern matches which bind values with stack indices
 		for i, group := range E.Matches {
 			j := 0
