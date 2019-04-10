@@ -1,2 +1,3 @@
-# slang-go
-Dynamic functional programming language with higher order patterns 
+# Slang
+
+Slang is a dynamic functional programming language with higher order patterns
