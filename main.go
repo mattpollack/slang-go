@@ -15,25 +15,35 @@ func main() {
 		fmt.Println("\nExecution time:", time.Now().Sub(startTime))
 	}()
 
-	prog, err := ast.Parse(
+	AST, err := ast.Parse([]byte(
 		`
-let rec = {
-  0 -> 1
-  n -> (+ n (rec (- n 1)))
-}
-
-(fact 10)
-
-`)
+(1
+ 2
+ 3
+ 4)
+`))
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	ast.Print(prog)
+	ast.Print(AST)
 
 	fmt.Println("\n---------------------------------------\n")
 
-	compile.Compile(prog)
+	prog := compile.Compile(AST)
+	prog.Print()
+
+	/*
+		fmt.Println("\n---------------------------------------\n")
+		block := vm.BasicBlock{Label: "test"}
+		block.Push(&vm.OP{vm.INS_ADD})
+		block.Push(vm.NewInt32(10))
+		block.Push(vm.NewInt32(10))
+		block.Push(&vm.OP{vm.INS_SUB})
+		block.Push(&vm.OP{vm.INS_MUL})
+		block.Push(&vm.OP{vm.INS_DIV})
+		block.Print()
+	*/
 }

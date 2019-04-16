@@ -2,126 +2,91 @@ package compile
 
 import (
 	"../ast"
-
-	"fmt"
+	"../vm"
 )
 
-var builtins map[string]func() = map[string]func(){
-	"+": func() {
-		fmt.Println("  add")
-	},
-	"-": func() {
-		fmt.Println("  sub")
-	},
-	"eq": func() {
-		fmt.Println("  eq")
-	},
+var builtins map[string]vm.Instruction = map[string]vm.Instruction{
+	"+": &vm.OP{vm.INS_ADD},
+	"-": &vm.OP{vm.INS_SUB},
 }
 
 type Meta struct {
 	name string
 }
 
-func Compile(prog ast.Expression) {
-	prog = pass0(prog)
+func Compile(AST ast.Expression) *vm.Program {
+	AST = pass0(AST)
 
-	fmt.Println("__main_entry:")
-	visitExpr(prog)
+	prog := &vm.Program{}
+	block := &vm.BasicBlock{Label: "__main_entry"}
+
+	prog.Push(block)
+
+	visitExpr(prog, block, AST)
+
+	return prog
 }
 
-func visitMatch(m ast.Match) {
+func visitExpr(prog *vm.Program, block *vm.BasicBlock, e ast.Expression) {
+	if e == nil {
+		return
+	}
+
+	switch e.(type) {
+	case ast.Application:
+		block.Push(&vm.TODO{"Application"})
+
+	case ast.Pattern:
+		block.Push(&vm.TODO{"Pattern"})
+
+	case ast.Identifier:
+		block.Push(&vm.TODO{"Identifier"})
+
+	case ast.Label:
+		block.Push(&vm.TODO{"Label"})
+
+	case ast.String:
+		block.Push(&vm.TODO{"String"})
+
+	case ast.Number:
+		block.Push(&vm.TODO{"Number"})
+
+	case ast.Let:
+		block.Push(&vm.TODO{"Let"})
+
+	case ast.If:
+		block.Push(&vm.TODO{"If"})
+
+	case BoundValue:
+		block.Push(&vm.TODO{"BoundValue"})
+
+	default:
+		panic("Unexpected type")
+	}
+}
+
+func visitMatch(prog *vm.Program, block *vm.BasicBlock, m ast.Match) {
 	if m == nil {
 		return
 	}
 
 	switch node := m.(type) {
 	case ast.Identifier:
-		fmt.Println("  TODO identifier")
+		block.Push(&vm.TODO{"Match Identifier"})
+
 	case ast.Label:
-		fmt.Println("  TODO label")
+		block.Push(&vm.TODO{"Match Label"})
+
 	case ast.String:
-		fmt.Println("  TODO string")
+		block.Push(&vm.TODO{"Match String"})
+
 	case ast.Number:
-		fmt.Printf("  push %d\n", node.Value)
+		block.Push(&vm.TODO{"Match Number"})
+
 	case ast.Where:
-		fmt.Printf("  arg_set %d\n", node.Id.(BoundValue).Index)
-		//fmt.Println("  TODO: if true set arg")
-		visitExpr(node.Condition)
+		block.Push(&vm.TODO{"Match Where"})
+
 	default:
 		panic(node)
-	}
-}
-
-func visitExpr(e ast.Expression) {
-	if e == nil {
-		return
-	}
-
-	switch node := e.(type) {
-	case ast.Application:
-		for i := len(node.Body) - 1; i >= 0; i-- {
-			visitExpr(node.Body[i])
-		}
-
-	case ast.Pattern:
-		for i, group := range node.Matches {
-			for _, match := range group {
-				if i != 0 {
-					fmt.Printf("%s_%d:\n", node.MetaGet().(*Meta).name, i)
-				}
-
-				visitMatch(match)
-
-				if i < len(node.Matches)-1 {
-					fmt.Printf("  jne %s_%d\n", node.MetaGet().(*Meta).name, i+1)
-				} else {
-					fmt.Printf("  jne __RUNTIME_ERROR\n")
-				}
-
-				visitExpr(node.Bodies[i])
-				fmt.Printf("  return\n")
-
-				if i+1 != len(node.Matches) {
-					fmt.Println()
-				}
-			}
-		}
-
-	case ast.Identifier:
-		if fn, ok := builtins[node.Value]; ok {
-			fn()
-		} else {
-			fmt.Printf("  call %s\n", node.Value)
-		}
-
-	case ast.Label:
-		fmt.Println("  TODO label")
-
-	case ast.String:
-		fmt.Println("  TODO string")
-
-	case ast.Number:
-		fmt.Printf("  push %d\n", node.Value)
-
-	case ast.Let:
-		visitExpr(node.Body)
-		fmt.Println()
-
-		for i, e := range node.BoundValues {
-			meta := e.MetaGet().(*Meta)
-			meta.name = node.BoundIds[i].Value
-
-			fmt.Printf("%s:\n", meta.name)
-			visitExpr(e)
-		}
-
-	case ast.If:
-		fmt.Println("  TODO if")
-
-	case BoundValue:
-		fmt.Printf("  arg_get %d\n", node.Index)
-
-	default:
-		panic("TODO compile node if this type")
 	}
 }

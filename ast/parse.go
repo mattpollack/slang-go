@@ -1,9 +1,9 @@
 package ast
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 	"unicode"
 )
 
@@ -42,17 +42,55 @@ const (
 
 type token struct {
 	kind  int
-	value string
+	value []byte
 
 	line int
 	char int
 }
 
 type parser struct {
-	src string
+	src []byte
 
 	line int
 	char int
+}
+
+type mark struct {
+	b parser
+	a *parser
+}
+
+func NewMark(p *parser) *mark {
+	return &mark{
+		*p,
+		p,
+	}
+}
+
+func (m *mark) Done() parser {
+	p := parser{
+		m.b.src[:len(m.b.src)-len(m.a.src)],
+		m.b.line - m.a.line,
+		m.b.char - m.a.char,
+	}
+	p.SkipWS()
+
+	return p
+}
+
+func (m *mark) Error(msg string) error {
+	msg = fmt.Sprintf("[%d:%d] %s", m.a.line, m.a.char, msg)
+	src := fmt.Sprintf("%s\n", string(m.Done().src))
+
+	for i := 1; i < m.a.char; i++ {
+		src += " "
+	}
+
+	src += "^"
+
+	msg = fmt.Sprintf("%s\n%s", src, msg)
+
+	return errors.New(msg)
 }
 
 func (p *parser) SkipWS() {
@@ -90,7 +128,7 @@ func (p *parser) Next() token {
 	if len(p.src) == 0 {
 		return token{
 			TOKEN_KIND_EOF,
-			"",
+			nil,
 			p.line,
 			p.char,
 		}
@@ -98,10 +136,10 @@ func (p *parser) Next() token {
 
 	// Parse reserved
 	for i, s := range []string{"{", "}", "(", ")", "=", "->", "let", "if", "else", ":"} {
-		if strings.HasPrefix(p.src, s) {
+		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_BRACE_OPEN + i,
-				s,
+				[]byte(s),
 				p.line,
 				p.char,
 			}
@@ -115,10 +153,10 @@ func (p *parser) Next() token {
 
 	// Parse reserved identifiers
 	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "||", "&&"} {
-		if strings.HasPrefix(p.src, s) {
+		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_IDENTIFIER,
-				s,
+				[]byte(s),
 				p.line,
 				p.char,
 			}
@@ -213,7 +251,7 @@ func (p *parser) Next() token {
 
 	return token{
 		TOKEN_KIND_ERROR,
-		"Unexpected end of parsing",
+		[]byte("Unexpected end of parsing"),
 		p.line,
 		p.char,
 	}
@@ -244,7 +282,7 @@ func (p *parser) ConsumeIfNext(kind int) bool {
 
 func (p *parser) Identifier() (Expression, error) {
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
-		return NewIdentifier(p.Next().value)
+		return NewIdentifier(string(p.Next().value))
 	}
 
 	return nil, errors.New("Cannot parse identifier")
@@ -252,7 +290,7 @@ func (p *parser) Identifier() (Expression, error) {
 
 func (p *parser) Label() (Expression, error) {
 	if p.Peek().kind == TOKEN_KIND_LABEL {
-		return NewLabel(p.Next().value)
+		return NewLabel(string(p.Next().value))
 	}
 
 	return nil, errors.New("Cannot parse label")
@@ -260,7 +298,7 @@ func (p *parser) Label() (Expression, error) {
 
 func (p *parser) String() (Expression, error) {
 	if p.Peek().kind == TOKEN_KIND_STRING {
-		return NewString(p.Next().value)
+		return NewString(string(p.Next().value))
 	}
 
 	return nil, errors.New("Cannot parse string")
@@ -282,60 +320,64 @@ func (p *parser) Number() (Expression, error) {
 }
 
 func (p *parser) If() (Expression, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_IF) {
-		return nil, errors.New("If must begin with 'if'")
+		return nil, m.Error("If must begin with 'if'")
 	}
 
 	condition, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("If must have a condition")
 	}
 
 	tbody, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("If must have a body")
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_ELSE) {
-		return nil, errors.New("If must be followed by an else")
+		return nil, m.Error("If must be followed by an else")
 	}
 
 	fbody, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("Else must have a body")
 	}
 
 	return NewIf(condition, tbody, fbody)
 }
 
 func (p *parser) Let() (Expression, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_LET) {
-		return nil, errors.New("Let must begin with 'let'")
+		return nil, m.Error("Let must begin with 'let'")
 	}
 
 	identifier, err := p.Identifier()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error(err.Error())
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
-		return nil, errors.New("'=' must follow identifier in let")
+		return nil, m.Error("'=' must follow identifier in let")
 	}
 
 	value, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("Let must be assigned a value")
 	}
 
 	body, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("Let must have a body")
 	}
 
 	// If the body is a let expression, merge them
@@ -356,36 +398,40 @@ func (p *parser) Let() (Expression, error) {
 }
 
 func (p *parser) Where() (Match, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
-		return nil, errors.New("Where must be enclosed by parenthesis '(' ')'")
+		return nil, m.Error("Where must be enclosed by parenthesis '(' ')'")
 	}
 
 	id, err := p.Identifier()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error(err.Error())
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
-		return nil, errors.New("Colon must separate where identifier from body")
+		return nil, m.Error("Colon must separate where identifier from body")
 	}
 
 	body, err := p.Expression()
 
 	if err != nil {
-		return nil, err
+		return nil, m.Error("Where must have a body")
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
-		return nil, errors.New("Where must be enclosed by parenthesis '(' ')'")
+		return nil, m.Error("Where must be enclosed by parenthesis '(' ')'")
 	}
 
 	return NewWhere(id.(Identifier), body)
 }
 
 func (p *parser) Application() (Expression, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
-		return nil, errors.New("Application must be enclosed by parenthesis '(' ')'")
+		return nil, m.Error("Application must be enclosed by parenthesis '(' ')'")
 	}
 
 	body := []Expression{}
@@ -394,7 +440,7 @@ func (p *parser) Application() (Expression, error) {
 		expr, err := p.Expression()
 
 		if err != nil {
-			return nil, err
+			return nil, m.Error("Application may only contain expressions")
 		}
 
 		body = append(body, expr)
@@ -404,8 +450,10 @@ func (p *parser) Application() (Expression, error) {
 }
 
 func (p *parser) Pattern() (Expression, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_BRACE_OPEN) {
-		return nil, errors.New("Pattern must be enclosed by braces '{' '}'")
+		return nil, m.Error("Pattern must be enclosed by braces '{' '}'")
 	}
 
 	matchBodies := [][]Match{}
@@ -442,6 +490,8 @@ func (p *parser) Pattern() (Expression, error) {
 }
 
 func (p *parser) Match() (Match, error) {
+	m := NewMark(p)
+
 	switch p.Peek().kind {
 	case TOKEN_KIND_IDENTIFIER:
 		m, err := p.Identifier()
@@ -484,11 +534,13 @@ func (p *parser) Match() (Match, error) {
 
 		return m, nil
 	default:
-		return nil, errors.New("Unexpected error occured when parsing match")
+		return nil, m.Error("Unexpected error occured when parsing match")
 	}
 }
 
 func (p *parser) Expression() (Expression, error) {
+	m := NewMark(p)
+
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		return p.Identifier()
 	}
@@ -521,10 +573,10 @@ func (p *parser) Expression() (Expression, error) {
 		return p.If()
 	}
 
-	return nil, errors.New("Unexpected error occured when parsing an expression")
+	return nil, m.Error("Unexpected error occured when parsing an expression")
 }
 
-func Parse(src string) (Expression, error) {
+func Parse(src []byte) (Expression, error) {
 	p := parser{
 		src,
 		1,
@@ -534,7 +586,7 @@ func Parse(src string) (Expression, error) {
 	ast, err := p.Expression()
 
 	if err != nil {
-		return nil, fmt.Errorf("[%d:%d] %s", p.line, p.char, err.Error())
+		return nil, err
 	}
 
 	if p.Next().kind != TOKEN_KIND_EOF {

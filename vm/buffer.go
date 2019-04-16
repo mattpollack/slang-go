@@ -23,8 +23,6 @@ func (b *ByteBuffer) Len() int {
 	return len(b.bytes)
 }
 
-// -- GET
-
 func (b *ByteBuffer) Get8(i int) uint8 {
 	if i+1 > len(b.bytes) {
 		return 0
@@ -56,8 +54,6 @@ func (b *ByteBuffer) Get64(i int) uint64 {
 
 	return *(*uint64)(unsafe.Pointer(&b.bytes[i]))
 }
-
-// -- SET
 
 func (b *ByteBuffer) Set8(i int, value uint8) {
 	if i+1 >= len(b.bytes) {
