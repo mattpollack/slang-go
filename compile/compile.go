@@ -3,6 +3,8 @@ package compile
 import (
 	"../ast"
 	"../vm"
+
+	"fmt"
 )
 
 var builtins map[string]vm.Instruction = map[string]vm.Instruction{
@@ -24,23 +26,49 @@ func Compile(AST ast.Expression) *vm.Program {
 
 	visitExpr(prog, block, AST)
 
+	block.Push(&vm.OP{vm.INS_EXIT})
+
 	return prog
 }
 
-func visitExpr(prog *vm.Program, block *vm.BasicBlock, e ast.Expression) {
-	if e == nil {
+func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
+	if _e == nil {
 		return
 	}
 
-	switch e.(type) {
+	switch node := _e.(type) {
 	case ast.Application:
-		block.Push(&vm.TODO{"Application"})
+		for i := len(node.Body) - 1; i >= 0; i-- {
+			visitExpr(prog, block, node.Body[i])
+		}
 
 	case ast.Pattern:
-		block.Push(&vm.TODO{"Pattern"})
+		block.Push(&vm.OP{vm.INS_PUSH})
+		block.Push(&vm.TODO{fmt.Sprintf("address %s_0", block.Label)})
+		block.Push(&vm.OP{vm.INS_CALL})
+		block.Push(&vm.OP{vm.INS_RETURN})
+
+		for i, body := range node.Bodies {
+			next := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, i)}
+			prog.Push(next)
+
+			for _, m := range node.Matches[i] {
+				visitMatch(prog, next, m)
+				next.Push(&vm.OP{vm.INS_JNE})
+			}
+
+			visitExpr(prog, next, body)
+			next.Push(&vm.OP{vm.INS_RETURN})
+		}
 
 	case ast.Identifier:
-		block.Push(&vm.TODO{"Identifier"})
+		if v, ok := builtins[node.Value]; ok {
+			block.Push(v)
+		} else {
+			block.Push(&vm.OP{vm.INS_PUSH})
+			block.Push(&vm.TODO{fmt.Sprintf("address %s", node.Value)})
+			block.Push(&vm.OP{vm.INS_CALL})
+		}
 
 	case ast.Label:
 		block.Push(&vm.TODO{"Label"})
@@ -49,10 +77,17 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, e ast.Expression) {
 		block.Push(&vm.TODO{"String"})
 
 	case ast.Number:
-		block.Push(&vm.TODO{"Number"})
+		block.Push(&vm.OP{vm.INS_PUSH})
+		block.Push(vm.NewInt32(int32(node.Value)))
 
 	case ast.Let:
-		block.Push(&vm.TODO{"Let"})
+		for i, id := range node.BoundIds {
+			next := &vm.BasicBlock{Label: id.Value}
+			visitExpr(prog, next, node.BoundValues[i])
+			prog.Push(next)
+		}
+
+		visitExpr(prog, block, node.Body)
 
 	case ast.If:
 		block.Push(&vm.TODO{"If"})
@@ -81,7 +116,8 @@ func visitMatch(prog *vm.Program, block *vm.BasicBlock, m ast.Match) {
 		block.Push(&vm.TODO{"Match String"})
 
 	case ast.Number:
-		block.Push(&vm.TODO{"Match Number"})
+		block.Push(&vm.OP{vm.INS_PUSH})
+		block.Push(vm.NewInt32(int32(node.Value)))
 
 	case ast.Where:
 		block.Push(&vm.TODO{"Match Where"})

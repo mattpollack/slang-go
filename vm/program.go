@@ -19,16 +19,32 @@ const (
 	INS_MUL
 	INS_DIV
 
+	INS_JNE
+
+	INS_PUSH
+
+	INS_CALL
+	INS_RETURN
+	INS_EXIT
+
 	T_INT_32
+	T_ADDRESS
 )
 
 var INS_NAME map[int]string = map[int]string{
-	INS_ADD: "ADD",
-	INS_SUB: "SUB",
-	INS_MUL: "MUL",
-	INS_DIV: "DIV",
+	INS_ADD: "add",
+	INS_SUB: "sub",
+	INS_MUL: "mul",
+	INS_DIV: "div",
 
-	T_INT_32: "INT32",
+	INS_JNE: "jne",
+
+	INS_PUSH:   "push",
+	INS_CALL:   "call",
+	INS_RETURN: "return",
+	INS_EXIT:   "exit",
+
+	T_INT_32: "int32",
 }
 
 type Program struct {
@@ -40,10 +56,23 @@ func (p *Program) Push(block *BasicBlock) {
 }
 
 func (p *Program) Print() {
-	for _, b := range p.Blocks {
+	for i, b := range p.Blocks {
 		b.Print()
-		fmt.Println()
+
+		if i != len(p.Blocks)-1 {
+			fmt.Println()
+		}
 	}
+}
+
+func (p *Program) Size() int {
+	size := 0
+
+	for _, b := range p.Blocks {
+		size += b.Size()
+	}
+
+	return size
 }
 
 type BasicBlock struct {
@@ -61,6 +90,16 @@ func (b *BasicBlock) Print() {
 	for _, i := range b.Body {
 		i.Print()
 	}
+}
+
+func (b *BasicBlock) Size() int {
+	size := 0
+
+	for _, b := range b.Body {
+		size += b.Size()
+	}
+
+	return size
 }
 
 type Instruction interface {
@@ -82,10 +121,11 @@ func (in *TODO) Size() int {
 }
 
 func (in *TODO) Print() {
-	fmt.Printf("  TODO %s\n", in.Thing)
+	fmt.Printf("  # TODO: %s\n", in.Thing)
 }
 
 // --------------------------------------------------------
+
 type OP struct {
 	Kind uint16
 }
@@ -123,7 +163,8 @@ type Data struct {
 }
 
 func (in *Data) Emit(buffer ByteBuffer) {
-	buffer.Set8(buffer.Len(), uint8(in.Kind))
+	buffer.Set16(buffer.Len(), uint16(in.Kind))
+	buffer.Set32(buffer.Len(), uint32(len(in.Value)))
 
 	for _, b := range in.Value {
 		buffer.Set8(buffer.Len(), uint8(b))
@@ -135,6 +176,6 @@ func (in *Data) Size() int {
 }
 
 func (in *Data) Print() {
-	fmt.Printf("  %s ", INS_NAME[int(in.Kind)])
+	fmt.Printf("  %s (%d) ", INS_NAME[int(in.Kind)], len(in.Value)*8)
 	fmt.Println(in.Value)
 }
