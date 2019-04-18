@@ -1,6 +1,6 @@
 # Slang
 
-Slang is a dynamically typed functional programming language for expressing safe abstractions through pattern matching and compile time preconditions
+Slang is a dynamically typed functional programming language for expressing safe abstractions through pattern matching and preconditions. Slang is short for (s)imple (lang)uage. Typically referring to the use of informal speech and jargon, here ‘slang’ refers to the dynamic typing aspect of the language. 
 
 ```
 let range = {
@@ -15,3 +15,4 @@ let val = test 11 # compile time error
 
 println "No errors!"
 ```
+

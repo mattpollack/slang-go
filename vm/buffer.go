@@ -15,6 +15,26 @@ func NewByteBuffer() *ByteBuffer {
 	}
 }
 
+func (b *ByteBuffer) Bytes() []byte {
+	return b.bytes
+}
+
+func (b *ByteBuffer) Slice(f int, t int) *ByteBuffer {
+	if f < 0 || t > len(b.bytes) || (t != -1 && t < f) {
+		panic("ByteBuffer slice is out of range")
+	}
+
+	if t == -1 {
+		return &ByteBuffer{b.bytes[f:]}
+	}
+
+	return &ByteBuffer{b.bytes[f:t]}
+}
+
+func (b *ByteBuffer) Push(bytes []byte) {
+	b.bytes = append(append([]byte{}, bytes...), b.bytes...)
+}
+
 func (b *ByteBuffer) Extend(i int) {
 	b.bytes = append(b.bytes, make([]byte, i)...)
 }

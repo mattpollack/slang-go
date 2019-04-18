@@ -43,31 +43,39 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
 		}
 
 	case ast.Pattern:
-		block.Push(&vm.OP{vm.INS_PUSH})
-		block.Push(&vm.TODO{fmt.Sprintf("address %s_0", block.Label)})
 		block.Push(&vm.OP{vm.INS_CALL})
+		block.Push(&vm.Address{fmt.Sprintf("%s_0", block.Label)})
 		block.Push(&vm.OP{vm.INS_RETURN})
 
+		// Push a basic block for each body
 		for i, body := range node.Bodies {
 			next := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, i)}
 			prog.Push(next)
 
 			for _, m := range node.Matches[i] {
+				next.Push(&vm.OP{vm.INS_DUP})
 				visitMatch(prog, next, m)
 				next.Push(&vm.OP{vm.INS_JNE})
+				next.Push(&vm.Address{fmt.Sprintf("%s_%d", block.Label, i+1)})
+				next.Push(&vm.OP{vm.INS_POP})
 			}
 
 			visitExpr(prog, next, body)
 			next.Push(&vm.OP{vm.INS_RETURN})
 		}
 
+		// Push the error handling block
+		errorHandler := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, len(node.Bodies))}
+		prog.Push(errorHandler)
+		errorHandler.Push(&vm.TODO{"error handling"})
+		errorHandler.Push(&vm.OP{vm.INS_EXIT})
+
 	case ast.Identifier:
 		if v, ok := builtins[node.Value]; ok {
 			block.Push(v)
 		} else {
-			block.Push(&vm.OP{vm.INS_PUSH})
-			block.Push(&vm.TODO{fmt.Sprintf("address %s", node.Value)})
 			block.Push(&vm.OP{vm.INS_CALL})
+			block.Push(&vm.Address{fmt.Sprintf("%s", node.Value)})
 		}
 
 	case ast.Label:

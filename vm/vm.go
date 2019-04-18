@@ -1,6 +1,5 @@
 package vm
 
-/*
 import (
 	"fmt"
 )
@@ -8,70 +7,38 @@ import (
 const (
 	_ = iota
 
-	I_POP_32
-	I_PUSH_32
-	I_DUP_32
-
-	I_ADD_32
-	I_SUB_32
-	I_MUL_32
-	I_DIV_32
-
-	I_GOTO_32 // 32 bit immediate address
-
-	I_EXIT
-
 	VM_RUNNING
+	VM_DONE
 	VM_ERROR
-	VM_EXITED
 )
 
-var I_STR map[int]string = map[int]string{
-	I_POP_32:  "POP_32",
-	I_PUSH_32: "PUSH_32",
-	I_DUP_32:  "DUP_32",
-
-	I_ADD_32: "ADD_32",
-	I_SUB_32: "SUB_32",
-	I_MUL_32: "MUL_32",
-	I_DIV_32: "DIV_32",
-
-	I_GOTO_32: "GOTO_32",
-
-	I_EXIT: "EXIT",
-}
-
 type VM struct {
-	Prog  *ByteBuffer
-	stack *ByteBuffer
+	Prog      *ByteBuffer
+	stack     *ByteBuffer
+	callStack []int
 
 	pp int
-	sp int
 
-	status int
+	Status int
 	Err    error
 }
 
-func NewVM() *VM {
+func NewVM(prog *ByteBuffer) *VM {
 	return &VM{
+		prog,
 		NewByteBuffer(),
-		NewByteBuffer(),
-		0,
+		[]int{},
 		0,
 		VM_RUNNING,
 		nil,
 	}
 }
 
-func (v *VM) SetInstruction(code uint8) {
-	v.Prog.Set8(v.Prog.Len(), code)
-}
-
 func (v *VM) Error(err error) int {
-	v.status = VM_ERROR
+	v.Status = VM_ERROR
 	v.Err = err
 
-	return v.status
+	return v.Status
 }
 
 func (v *VM) Step() int {
@@ -79,53 +46,112 @@ func (v *VM) Step() int {
 		return v.Error(fmt.Errorf("Program pointer %d is out of bounds", v.pp))
 	}
 
-	switch v.Prog.Get8(v.pp) {
-	case I_ADD_32:
-		a := int(v.stack.Get32(v.sp - 4))
-		b := int(v.stack.Get32(v.sp - 8))
+	switch v.Prog.Get16(v.pp) {
+	case INS_PUSH:
+		// Realistically this doesn't need to be decoded
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
 
-		v.stack.Set32(v.sp-8, uint32(a+b))
-		v.sp -= 4
-		v.pp += 1
+		arg := &Data{}
+		arg.Decode(v.Prog.Slice(v.pp, -1))
 
-	case I_PUSH_32:
-		v.stack.Set32(v.sp, v.Prog.Get32(v.pp+1))
-		v.pp += 5
-		v.sp += 4
+		// Use a bytebuffer to extract bytes
+		tempBuffer := NewByteBuffer()
+		arg.Emit(tempBuffer)
 
-	case I_POP_32:
-		v.sp -= 4
-		v.pp += 1
+		v.stack.Push(tempBuffer.Bytes())
 
-	case I_DUP_32:
-		v.stack.Set32(v.sp, v.stack.Get32(v.sp-4))
-		v.sp += 4
-		v.pp += 1
+		v.pp += arg.Size()
 
-	case I_GOTO_32:
-		v.pp = int(v.stack.Get32(v.sp - 4))
-		v.sp -= 4
+	case INS_DUP:
+		// Realistically this doesn't need to be decoded
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
 
-	case I_EXIT:
-		v.status = VM_EXITED
-		v.pp += 1
+		arg := &Data{}
+		arg.Decode(v.stack.Slice(0, -1))
+
+		// Use a bytebuffer to extract bytes
+		tempBuffer := NewByteBuffer()
+		arg.Emit(tempBuffer)
+		v.stack.Push(tempBuffer.Bytes())
+
+	case INS_POP:
+		// Realistically this doesn't need to be decoded
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
+
+		arg := &Data{}
+		arg.Decode(v.stack)
+		v.stack = v.stack.Slice(arg.Size(), -1)
+
+	case INS_RETURN:
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
+
+	case INS_EXIT:
+		v.Status = VM_DONE
+
+	case INS_CALL:
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
+
+		arg := &Data{}
+		arg.Decode(v.Prog.Slice(v.pp, -1))
+
+		// Use a bytebuffer to extract address
+		tempBuffer := NewByteBuffer()
+		tempBuffer.Push(arg.Value)
+
+		// Set return address
+		v.callStack = append(v.callStack, v.pp)
+
+		// Set new program pointer
+		v.pp = int(tempBuffer.Get32(0))
+
+	case INS_JNE:
+		ins := &OP{}
+		ins.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += ins.Size()
+
+		arg0 := &Data{}
+		arg0.Decode(v.stack)
+		v.stack = v.stack.Slice(arg0.Size(), -1)
+
+		arg1 := &Data{}
+		arg1.Decode(v.stack)
+		v.stack = v.stack.Slice(arg0.Size(), -1)
+
+		addr := &Data{}
+		addr.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += addr.Size()
+
+		// Jump if arguments aren't equal
+		if !arg0.Equals(arg1) {
+			// Use a bytebuffer to extract address
+			tempBuffer := NewByteBuffer()
+			tempBuffer.Push(addr.Value)
+
+			// Set new program pointer
+			v.pp = int(tempBuffer.Get32(0))
+		}
 
 	default:
-		return v.Error(fmt.Errorf("Instruction with code %d doesn't exist", v.Prog.Get16(v.pp)))
+		return v.Error(fmt.Errorf("Instruction '%s' doesn't have an implementation", INS_NAME[int(v.Prog.Get16(v.pp))]))
 	}
 
-	return v.status
-}
-
-func (v *VM) PrintProg() {
-	fmt.Println(v.Prog)
+	return v.Status
 }
 
 func (v *VM) PrintStack() {
-	for i := v.sp - 1; i >= 0; i-- {
+	for i := v.stack.Len() - 1; i >= 0; i-- {
 		fmt.Printf("| %d\n", v.stack.Get8(i))
 	}
 
-	fmt.Println("-")
+	fmt.Println(v.callStack)
 }
-*/
