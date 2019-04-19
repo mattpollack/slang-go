@@ -26,6 +26,13 @@ func Compile(AST ast.Expression) *vm.Program {
 
 	visitExpr(prog, block, AST)
 
+	switch ins := block.Body[len(block.Body)-1].(type) {
+	case *vm.OP:
+		if ins.Kind == vm.INS_RETURN {
+			block.Body = block.Body[:len(block.Body)-1]
+		}
+	}
+
 	block.Push(&vm.OP{vm.INS_EXIT})
 
 	return prog

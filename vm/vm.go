@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"encoding/binary"
 	"fmt"
 )
 
@@ -34,6 +35,18 @@ func NewVM(prog *ByteBuffer) *VM {
 	}
 }
 
+func (v *VM) Pop() Instruction {
+	return nil
+}
+
+func (v *VM) NextOP() OP {
+	op := OP{}
+	op.Decode(v.Prog.Slice(v.pp, -1))
+	v.pp += op.Size()
+
+	return op
+}
+
 func (v *VM) Error(err error) int {
 	v.Status = VM_ERROR
 	v.Err = err
@@ -46,13 +59,8 @@ func (v *VM) Step() int {
 		return v.Error(fmt.Errorf("Program pointer %d is out of bounds", v.pp))
 	}
 
-	switch v.Prog.Get16(v.pp) {
+	switch v.NextOP().Kind {
 	case INS_PUSH:
-		// Realistically this doesn't need to be decoded
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
-
 		arg := &Data{}
 		arg.Decode(v.Prog.Slice(v.pp, -1))
 
@@ -65,11 +73,6 @@ func (v *VM) Step() int {
 		v.pp += arg.Size()
 
 	case INS_DUP:
-		// Realistically this doesn't need to be decoded
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
-
 		arg := &Data{}
 		arg.Decode(v.stack.Slice(0, -1))
 
@@ -79,30 +82,21 @@ func (v *VM) Step() int {
 		v.stack.Push(tempBuffer.Bytes())
 
 	case INS_POP:
-		// Realistically this doesn't need to be decoded
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
-
 		arg := &Data{}
 		arg.Decode(v.stack)
 		v.stack = v.stack.Slice(arg.Size(), -1)
 
-	case INS_RETURN:
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
-
 	case INS_EXIT:
 		v.Status = VM_DONE
 
-	case INS_CALL:
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
+	case INS_RETURN:
+		v.pp = v.callStack[len(v.callStack)-1]
+		v.callStack = v.callStack[:len(v.callStack)-1]
 
+	case INS_CALL:
 		arg := &Data{}
 		arg.Decode(v.Prog.Slice(v.pp, -1))
+		v.pp += arg.Size()
 
 		// Use a bytebuffer to extract address
 		tempBuffer := NewByteBuffer()
@@ -114,11 +108,24 @@ func (v *VM) Step() int {
 		// Set new program pointer
 		v.pp = int(tempBuffer.Get32(0))
 
-	case INS_JNE:
-		ins := &OP{}
-		ins.Decode(v.Prog.Slice(v.pp, -1))
-		v.pp += ins.Size()
+	case INS_ADD:
+		arg0 := &Data{}
+		arg0.Decode(v.stack.Slice(0, -1))
+		v.stack = v.stack.Slice(arg0.Size(), -1)
 
+		arg1 := &Data{}
+		arg1.Decode(v.stack.Slice(0, -1))
+		v.stack = v.stack.Slice(arg1.Size(), -1)
+
+		v0 := int32(binary.LittleEndian.Uint32(arg0.Value))
+		v1 := int32(binary.LittleEndian.Uint32(arg1.Value))
+
+		res := NewInt32(v0 + v1)
+		tempBuffer := NewByteBuffer()
+		res.Emit(tempBuffer)
+		v.stack.Push(tempBuffer.Bytes())
+
+	case INS_JNE:
 		arg0 := &Data{}
 		arg0.Decode(v.stack)
 		v.stack = v.stack.Slice(arg0.Size(), -1)
