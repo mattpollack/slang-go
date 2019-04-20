@@ -19,11 +19,14 @@ func main() {
 	src := []byte(
 		`
 let test = {
-  0 -> 5
-  5 -> (+ (+ 5 10) 15)
+  i j k -> (+ (+ i j) k)
+  i j 1 -> (+ i j)
+  i 2 3 -> i
+  4 5 6 -> 100
 }
 
-(test 5)
+(((test 1) 2) 3)
+
 `)
 	AST, err := ast.Parse(src)
 

@@ -19,21 +19,21 @@ type Meta struct {
 func Compile(AST ast.Expression) *vm.Program {
 	AST = pass0(AST)
 
+	main := &vm.BasicBlock{Label: "__main_entry"}
 	prog := &vm.Program{}
-	block := &vm.BasicBlock{Label: "__main_entry"}
+	prog.Push(main)
 
-	prog.Push(block)
+	visitExpr(prog, main, AST)
 
-	visitExpr(prog, block, AST)
-
-	switch ins := block.Body[len(block.Body)-1].(type) {
+	// Remove the return from main
+	switch ins := main.Body[len(main.Body)-1].(type) {
 	case *vm.OP:
 		if ins.Kind == vm.INS_RETURN {
-			block.Body = block.Body[:len(block.Body)-1]
+			main.Body = main.Body[:len(main.Body)-1]
 		}
 	}
 
-	block.Push(&vm.OP{vm.INS_EXIT})
+	main.Push(&vm.OP{vm.INS_EXIT})
 
 	return prog
 }
@@ -100,6 +100,16 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
 			next := &vm.BasicBlock{Label: id.Value}
 			visitExpr(prog, next, node.BoundValues[i])
 			prog.Push(next)
+
+			// If the last operation in a let binding isn't a return, add a return
+			switch ins := next.Body[len(next.Body)-1].(type) {
+			case *vm.OP:
+				if ins.Kind != vm.INS_RETURN {
+					next.Push(&vm.OP{vm.INS_RETURN})
+				}
+			default:
+				next.Push(&vm.OP{vm.INS_RETURN})
+			}
 		}
 
 		visitExpr(prog, block, node.Body)

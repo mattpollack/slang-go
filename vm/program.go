@@ -30,6 +30,7 @@ const (
 	INS_EXIT
 
 	T_INT_32
+	T_STRING
 	T_ADDRESS
 )
 
@@ -50,27 +51,8 @@ var INS_NAME map[int]string = map[int]string{
 	INS_EXIT:   "exit",
 
 	T_INT_32:  "int32",
+	T_STRING:  "string",
 	T_ADDRESS: "address",
-}
-
-var INS_OBJ map[int]Instruction = map[int]Instruction{
-	INS_ADD: &OP{},
-	INS_SUB: &OP{},
-	INS_MUL: &OP{},
-	INS_DIV: &OP{},
-
-	INS_JNE: &OP{},
-
-	INS_DUP: &OP{},
-	INS_POP: &OP{},
-
-	INS_PUSH:   &OP{},
-	INS_CALL:   &OP{},
-	INS_RETURN: &OP{},
-	INS_EXIT:   &OP{},
-
-	T_INT_32:  &Data{},
-	T_ADDRESS: &Data{},
 }
 
 type Program struct {
@@ -232,6 +214,13 @@ func NewInt32(val int32) *Data {
 	return &Data{
 		T_INT_32,
 		buff,
+	}
+}
+
+func NewString(str string) *Data {
+	return &Data{
+		T_STRING,
+		[]byte(str),
 	}
 }
 
