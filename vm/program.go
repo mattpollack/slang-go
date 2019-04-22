@@ -32,6 +32,7 @@ const (
 	T_INT_32
 	T_STRING
 	T_ADDRESS
+	T_ENVIRONMENT
 )
 
 var INS_NAME map[int]string = map[int]string{
@@ -50,9 +51,10 @@ var INS_NAME map[int]string = map[int]string{
 	INS_RETURN: "return",
 	INS_EXIT:   "exit",
 
-	T_INT_32:  "int32",
-	T_STRING:  "string",
-	T_ADDRESS: "address",
+	T_INT_32:      "int32",
+	T_STRING:      "string",
+	T_ADDRESS:     "address",
+	T_ENVIRONMENT: "environment",
 }
 
 type Program struct {

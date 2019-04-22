@@ -540,6 +540,6 @@ func printHelp(ast Expression, tab int) {
 		printHelp(node.Fbody, tab+1)
 	default:
 		printTab(tab)
-		fmt.Printf("<Unexpected>")
+		fmt.Print(node)
 	}
 }

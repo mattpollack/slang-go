@@ -35,8 +35,6 @@ let test = {
 		return
 	}
 
-	ast.Print(AST)
-
 	fmt.Println("\n---------------------------------------\n")
 
 	prog := compile.Compile(AST)
@@ -44,21 +42,23 @@ let test = {
 
 	fmt.Printf("\nSummary\n- Bytecode:\t %d bytes\n- Source:\t %d bytes\n", prog.Size(), len(src))
 
-	fmt.Println("\n---------------------------------------\n")
+	if false {
+		fmt.Println("\n---------------------------------------\n")
 
-	run := vm.NewVM(prog.Render())
+		run := vm.NewVM(prog.Render())
 
-	for run.Status == vm.VM_RUNNING {
-		//run.PrintStack()
-		//fmt.Println()
+		for run.Status == vm.VM_RUNNING {
+			//run.PrintStack()
+			//fmt.Println()
 
-		run.Step()
-	}
+			run.Step()
+		}
 
-	if run.Err != nil {
-		fmt.Println(run.Err)
-	} else {
-		fmt.Println("# RESULT:")
-		run.PrintStack()
+		if run.Err != nil {
+			fmt.Println(run.Err)
+		} else {
+			fmt.Println("# RESULT:")
+			run.PrintStack()
+		}
 	}
 }
