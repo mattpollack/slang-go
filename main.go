@@ -20,9 +20,6 @@ func main() {
 		`
 let test = {
   i j k -> (+ (+ i j) k)
-  i j 1 -> (+ i j)
-  i 2 3 -> i
-  4 5 6 -> 100
 }
 
 (((test 1) 2) 3)

@@ -20,12 +20,14 @@ const (
 	INS_DIV
 
 	INS_JNE
+	INS_JMP
 
 	INS_DUP
 	INS_POP
 
 	INS_PUSH
 	INS_CALL
+	INS_CALL_ENV
 	INS_RETURN
 	INS_EXIT
 
@@ -42,14 +44,16 @@ var INS_NAME map[int]string = map[int]string{
 	INS_DIV: "div",
 
 	INS_JNE: "jne",
+	INS_JMP: "jmp",
 
 	INS_DUP: "dup",
 	INS_POP: "pop",
 
-	INS_PUSH:   "push",
-	INS_CALL:   "call",
-	INS_RETURN: "return",
-	INS_EXIT:   "exit",
+	INS_PUSH:     "push",
+	INS_CALL:     "call",
+	INS_CALL_ENV: "call_env",
+	INS_RETURN:   "return",
+	INS_EXIT:     "exit",
 
 	T_INT_32:      "int32",
 	T_STRING:      "string",
@@ -163,6 +167,23 @@ func (in *TODO) Size() int {
 
 func (in *TODO) Print() {
 	fmt.Printf("  # TODO: %s\n", in.Thing)
+}
+
+// --------------------------------------------------------
+
+type Comment struct {
+	Thing string
+}
+
+func (in *Comment) Decode(*ByteBuffer) {}
+func (in *Comment) Emit(*ByteBuffer)   {}
+
+func (in *Comment) Size() int {
+	return 0
+}
+
+func (in *Comment) Print() {
+	fmt.Printf("  # %s\n", in.Thing)
 }
 
 // --------------------------------------------------------

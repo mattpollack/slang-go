@@ -16,8 +16,20 @@ type Meta struct {
 	name string
 }
 
+func ASSERT(b bool, msg string) {
+	if !b {
+		panic(msg)
+	}
+}
+
 func Compile(AST ast.Expression) *vm.Program {
 	AST = pass0(AST)
+
+	fmt.Println("\n---------------------------------------\n")
+
+	ast.Print(AST)
+
+	fmt.Println("\n---------------------------------------\n")
 
 	main := &vm.BasicBlock{Label: "__main_entry"}
 	prog := &vm.Program{}
@@ -49,6 +61,7 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
 			visitExpr(prog, block, node.Body[i])
 		}
 
+		// At this point patterns have been properly converted to partially applied envs
 	case ast.Pattern:
 		block.Push(&vm.OP{vm.INS_CALL})
 		block.Push(&vm.Address{fmt.Sprintf("%s_0", block.Label)})
@@ -60,22 +73,40 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
 			prog.Push(next)
 
 			for _, m := range node.Matches[i] {
-				next.Push(&vm.OP{vm.INS_DUP})
-				visitMatch(prog, next, m)
-				next.Push(&vm.OP{vm.INS_JNE})
-				next.Push(&vm.Address{fmt.Sprintf("%s_%d", block.Label, i+1)})
-				next.Push(&vm.OP{vm.INS_POP})
+				visitMatch(prog, next, m, fmt.Sprintf("%s_%d", block.Label, i+1))
 			}
 
 			visitExpr(prog, next, body)
 			next.Push(&vm.OP{vm.INS_RETURN})
 		}
 
-		// Push the error handling block
-		errorHandler := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, len(node.Bodies))}
-		prog.Push(errorHandler)
-		errorHandler.Push(&vm.TODO{"error handling"})
-		errorHandler.Push(&vm.OP{vm.INS_EXIT})
+		/*
+			block.Push(&vm.OP{vm.INS_CALL})
+			block.Push(&vm.Address{fmt.Sprintf("%s_0", block.Label)})
+			block.Push(&vm.OP{vm.INS_RETURN})
+
+			// Push a basic block for each body
+			for i, body := range node.Bodies {
+				next := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, i)}
+				prog.Push(next)
+
+				for _, m := range node.Matches[i] {
+					next.Push(&vm.OP{vm.INS_DUP})
+					visitMatch(prog, next, m)
+					next.Push(&vm.OP{vm.INS_JNE})
+					next.Push(&vm.Address{fmt.Sprintf("%s_%d", block.Label, i+1)})
+					next.Push(&vm.OP{vm.INS_POP})
+				}
+
+				visitExpr(prog, next, body)
+				next.Push(&vm.OP{vm.INS_RETURN})
+			}
+
+			// Push the error handling block
+			errorHandler := &vm.BasicBlock{Label: fmt.Sprintf("%s_%d", block.Label, len(node.Bodies))}
+			prog.Push(errorHandler)
+			errorHandler.Push(&vm.TODO{"error handling"})
+			errorHandler.Push(&vm.OP{vm.INS_EXIT})*/
 
 	case ast.Identifier:
 		if v, ok := builtins[node.Value]; ok {
@@ -125,29 +156,36 @@ func visitExpr(prog *vm.Program, block *vm.BasicBlock, _e ast.Expression) {
 	}
 }
 
-func visitMatch(prog *vm.Program, block *vm.BasicBlock, m ast.Match) {
+func visitMatch(prog *vm.Program, block *vm.BasicBlock, m ast.Match, addr string) {
 	if m == nil {
 		return
 	}
 
 	switch node := m.(type) {
 	case ast.Identifier:
-		block.Push(&vm.TODO{"Match Identifier"})
+		block.Push(&vm.Comment{"Identifier is NOOP"})
+		block.Push(&vm.OP{vm.INS_JMP})
+		block.Push(&vm.Address{addr})
 
 	case ast.Label:
+		block.Push(&vm.OP{vm.INS_DUP})
 		block.Push(&vm.TODO{"Match Label"})
+		block.Push(&vm.OP{vm.INS_JNE})
+		block.Push(&vm.Address{addr})
 
 	case ast.String:
+		block.Push(&vm.OP{vm.INS_DUP})
 		block.Push(&vm.TODO{"Match String"})
+		block.Push(&vm.OP{vm.INS_JNE})
+		block.Push(&vm.Address{addr})
 
 	case ast.Number:
 		block.Push(&vm.OP{vm.INS_PUSH})
 		block.Push(vm.NewInt32(int32(node.Value)))
+		block.Push(&vm.OP{vm.INS_JNE})
+		block.Push(&vm.Address{addr})
 
 	case ast.Where:
 		block.Push(&vm.TODO{"Match Where"})
-
-	default:
-		panic(node)
 	}
 }

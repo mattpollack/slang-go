@@ -4,13 +4,19 @@ import (
 	"fmt"
 )
 
+// Provides access to a meta object
 type Meta interface {
 	MetaSet(interface{}) interface{}
 	MetaGet() interface{}
 }
 
+type Prints interface {
+	Print(int)
+}
+
 type Expression interface {
 	Meta
+	Prints
 	EqualsExpr(Expression) bool
 
 	IsExpression()
@@ -18,6 +24,7 @@ type Expression interface {
 
 type Match interface {
 	Meta
+	Prints
 	EqualsMatch(Match) bool
 
 	IsMatch()
@@ -67,6 +74,19 @@ func (e Application) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (E Application) Print(tab int) {
+	printTab(tab)
+	fmt.Println("(")
+
+	for _, e := range E.Body {
+		e.Print(tab + 1)
+		fmt.Println()
+	}
+
+	printTab(tab)
+	fmt.Print(")")
+}
+
 // --------------------------------------------------------
 
 type If struct {
@@ -105,6 +125,18 @@ func (e If) MetaSet(meta interface{}) interface{} {
 	e.meta = meta
 
 	return e
+}
+
+func (node If) Print(tab int) {
+	printTab(tab)
+	fmt.Println("if ")
+	node.Condition.Print(tab + 1)
+	fmt.Println()
+	node.Tbody.Print(tab + 1)
+	fmt.Println()
+	printTab(tab)
+	fmt.Println("else ")
+	node.Fbody.Print(tab + 1)
 }
 
 // --------------------------------------------------------
@@ -161,6 +193,23 @@ func (e Pattern) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (node Pattern) Print(tab int) {
+	printTab(tab)
+	fmt.Println("{")
+
+	for i := 0; i < len(node.Bodies); i++ {
+		for _, m := range node.Matches[i] {
+			m.Print(tab)
+		}
+
+		fmt.Println("-> ")
+		node.Bodies[i].Print(tab + 1)
+		fmt.Println()
+	}
+	printTab(tab)
+	fmt.Print("}")
+}
+
 // --------------------------------------------------------
 
 type Identifier struct {
@@ -205,6 +254,11 @@ func (e Identifier) MetaSet(meta interface{}) interface{} {
 	e.meta = meta
 
 	return e
+}
+
+func (node Identifier) Print(tab int) {
+	printTab(tab)
+	fmt.Println(node.Value)
 }
 
 // --------------------------------------------------------
@@ -253,6 +307,11 @@ func (e Label) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (node Label) Print(tab int) {
+	printTab(tab)
+	fmt.Print(node.Value)
+}
+
 // --------------------------------------------------------
 
 type String struct {
@@ -299,6 +358,11 @@ func (e String) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (node String) Print(tab int) {
+	printTab(tab)
+	fmt.Println(node.Value)
+}
+
 // --------------------------------------------------------
 
 type Number struct {
@@ -343,6 +407,11 @@ func (e Number) MetaSet(meta interface{}) interface{} {
 	e.meta = meta
 
 	return e
+}
+
+func (node Number) Print(tab int) {
+	printTab(tab)
+	fmt.Println(node.Value)
 }
 
 // --------------------------------------------------------
@@ -393,6 +462,20 @@ func (e Let) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (node Let) Print(tab int) {
+	for i, id := range node.BoundIds {
+		printTab(tab)
+		fmt.Print("let ")
+		id.Print(0)
+		fmt.Println(" =")
+		node.BoundValues[i].Print(tab + 1)
+		fmt.Println()
+	}
+
+	node.Body.Print(tab)
+	fmt.Println()
+}
+
 // --------------------------------------------------------
 
 type Where struct {
@@ -431,6 +514,16 @@ func (e Where) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (node Where) Print(tab int) {
+	fmt.Printf("(")
+	node.Id.Print(0)
+	fmt.Printf(" : \n")
+	node.Condition.Print(tab + 1)
+	fmt.Println()
+	printTab(tab)
+	fmt.Println(")")
+}
+
 // --------------------------------------------------------
 
 func printTab(tab int) {
@@ -439,107 +532,12 @@ func printTab(tab int) {
 	}
 }
 
-func PrintMatch(m Match, tab int) {
-	switch node := m.(type) {
-	case Identifier:
-		fmt.Print(node.Value)
-	case Label:
-		fmt.Printf(".%s", node.Value)
-	case String:
-		fmt.Print("\"%s\"", node.Value)
-	case Number:
-		fmt.Print(node.Value)
-	case Where:
-		fmt.Printf("(")
-		printHelp(node.Id, 0)
-		fmt.Printf(" : \n")
-		printHelp(node.Condition, tab+1)
-		fmt.Println()
-		printTab(tab)
-		fmt.Print(")")
-	default:
-		fmt.Print("<Match>")
+func PrintTab(tab int) {
+	for ; tab > 0; tab-- {
+		fmt.Print("  ")
 	}
 }
 
 func Print(ast Expression) {
-	printHelp(ast, 0)
-	fmt.Println()
-}
-
-func printHelp(ast Expression, tab int) {
-	if ast == nil {
-		printTab(tab)
-		fmt.Println("<nil>")
-		return
-	}
-
-	switch node := ast.(type) {
-	case Application:
-		printTab(tab)
-		fmt.Println("(")
-
-		for _, e := range node.Body {
-			printHelp(e, tab+1)
-			fmt.Println()
-		}
-
-		printTab(tab)
-		fmt.Print(")")
-	case Pattern:
-		printTab(tab)
-		fmt.Println("{")
-
-		for i := 0; i < len(node.Bodies); i++ {
-			printTab(tab)
-
-			for _, m := range node.Matches[i] {
-				PrintMatch(m, tab)
-				fmt.Print(" ")
-			}
-
-			fmt.Println("-> ")
-			printHelp(node.Bodies[i], tab+1)
-			fmt.Println()
-		}
-		printTab(tab)
-		fmt.Print("}")
-	case Identifier:
-		printTab(tab)
-		fmt.Print(node.Value)
-	case Label:
-		printTab(tab)
-		fmt.Printf(".%s", node.Value)
-	case String:
-		printTab(tab)
-		fmt.Printf("\"%s\"", node.Value)
-	case Number:
-		printTab(tab)
-		fmt.Print(node.Value)
-	case Let:
-		for i, id := range node.BoundIds {
-			printTab(tab)
-			fmt.Print("let ")
-			printHelp(id, 0)
-			fmt.Println(" =")
-			printHelp(node.BoundValues[i], tab+1)
-			fmt.Println()
-		}
-
-		printHelp(node.Body, tab)
-		fmt.Println()
-	case If:
-		printTab(tab)
-		fmt.Println("if ")
-		printHelp(node.Condition, tab+1)
-		fmt.Println()
-		printHelp(node.Tbody, tab+1)
-		fmt.Println()
-		printTab(tab)
-		fmt.Println("else ")
-		printHelp(node.Fbody, tab+1)
-	default:
-		printTab(tab)
-		fmt.Print(node)
-	}
+	ast.Print(0)
 }

@@ -42,6 +42,11 @@ func (e BoundValue) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (e BoundValue) Print(tab int) {
+	ast.PrintTab(tab)
+	fmt.Printf("arg[%d]\n", e.Index)
+}
+
 // --------------------------------------------------------
 
 func ReplaceMatch(in ast.Match, replace ast.Expression, with ast.Expression) ast.Match {
@@ -131,6 +136,8 @@ func pass0(e ast.Expression) ast.Expression {
 			E.Body[i] = pass0(E.Body[i])
 		}
 
+		return E
+
 	case ast.Pattern:
 		// Visit bodies
 		for i, _ := range E.Bodies {
@@ -147,7 +154,7 @@ func pass0(e ast.Expression) ast.Expression {
 					Body: []ast.Expression{
 						ast.Identifier{Value: fmt.Sprintf("%s_0", name)},
 						buildEnv(len(E.Bodies)),
-						ast.Identifier{Value: "n"},
+						NewBoundValue(0),
 					},
 				},
 			},
@@ -178,7 +185,7 @@ func pass0(e ast.Expression) ast.Expression {
 				)
 				env.Bodies = append(env.Bodies,
 					ast.Application{Body: []ast.Expression{
-						ast.Identifier{Value: "env"},
+						NewBoundValue(1),
 						ast.Label{Value: fmt.Sprintf("arg_%d", j)},
 					}},
 				)
@@ -188,7 +195,7 @@ func pass0(e ast.Expression) ast.Expression {
 			env.Matches = append(env.Matches,
 				[]ast.Match{ast.Label{Value: fmt.Sprintf("arg_%d", i)}},
 			)
-			env.Bodies = append(env.Bodies, ast.Identifier{Value: "n"})
+			env.Bodies = append(env.Bodies, NewBoundValue(0))
 
 			// Add match state to environment
 			for j, matchGroup := range E.Matches {
@@ -209,14 +216,14 @@ func pass0(e ast.Expression) ast.Expression {
 							ast.Identifier{Value: "&&"},
 							ast.Application{
 								Body: []ast.Expression{
-									ast.Identifier{Value: "env"},
+									NewBoundValue(1),
 									ast.Label{Value: fmt.Sprintf("match_%d", j)},
 								},
 							},
 							ast.Application{
 								Body: []ast.Expression{
 									ast.Identifier{Value: "=="},
-									ast.Identifier{Value: "n"},
+									NewBoundValue(0),
 									matchGroup[i].(ast.Expression),
 								},
 							},
@@ -249,7 +256,7 @@ func pass0(e ast.Expression) ast.Expression {
 					Id: ast.Identifier{Value: "env"},
 					Condition: ast.Application{
 						Body: []ast.Expression{
-							ast.Identifier{Value: "env"},
+							NewBoundValue(0),
 							ast.Label{Value: fmt.Sprintf("match_%d", i)},
 						},
 					},
@@ -260,7 +267,7 @@ func pass0(e ast.Expression) ast.Expression {
 			for j, match := range E.Matches[i] {
 				with := ast.Application{
 					Body: []ast.Expression{
-						ast.Identifier{Value: "env"},
+						NewBoundValue(0),
 						ast.Label{Value: fmt.Sprintf("arg_%d", j)},
 					},
 				}
@@ -288,7 +295,7 @@ func pass0(e ast.Expression) ast.Expression {
 		res.BoundValues = append(res.BoundValues, finalBody)
 		res.Body = entry
 
-		for i, _ := range E.Bodies {
+		for i := 0; i <= len(E.Matches[0]); i++ {
 			res.BoundIds = append(res.BoundIds, ast.Identifier{Value: fmt.Sprintf("%s_%d", name, i)})
 		}
 
@@ -297,12 +304,38 @@ func pass0(e ast.Expression) ast.Expression {
 	case ast.Let:
 		for i, _ := range E.BoundValues {
 			E.BoundValues[i] = pass0(E.BoundValues[i])
+
+			/* NOTE: maybe replace ids with parent id?????
+			val := pass0(E.BoundValues[i])
+
+			switch V := val.(type) {
+			case ast.Let:
+				E.BoundIds =
+					append(append(append(
+						[]ast.Identifier{},
+						E.BoundIds[:i]...),
+						V.BoundIds...),
+						E.BoundIds[i+1:]...)
+				E.BoundValues =
+					append(append(append(
+						[]ast.Expression{},
+						E.BoundValues[:i]...),
+						V.BoundValues...),
+						E.BoundValues[i+1:]...)
+			default:
+				E.BoundValues[i] = val
+			}
+			*/
 		}
+
+		return E
 
 	case ast.If:
 		E.Condition = pass0(E.Condition)
 		E.Tbody = pass0(E.Tbody)
 		E.Fbody = pass0(E.Fbody)
+
+		return E
 	}
 
 	return e

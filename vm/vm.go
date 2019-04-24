@@ -124,6 +124,9 @@ func (v *VM) Step() int {
 		// Generate and push new value
 		v.PushData(*NewInt32(v0 + v1))
 
+	case INS_JMP:
+		v.pp = int(binary.LittleEndian.Uint32(v.NextData().Value))
+
 	case INS_JNE:
 		// Pop arguments
 		arg0 := v.PopData()
