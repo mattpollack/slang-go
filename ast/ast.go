@@ -14,10 +14,14 @@ type Prints interface {
 	Print(int)
 }
 
+type Equals interface {
+	Equals(interface{}) bool
+}
+
 type Expression interface {
 	Meta
 	Prints
-	EqualsExpr(Expression) bool
+	Equals
 
 	IsExpression()
 }
@@ -25,7 +29,7 @@ type Expression interface {
 type Match interface {
 	Meta
 	Prints
-	EqualsMatch(Match) bool
+	Equals
 
 	IsMatch()
 }
@@ -47,12 +51,12 @@ func NewApplication(body []Expression) (Application, error) {
 	}, nil
 }
 
-func (A Application) EqualsExpr(b Expression) bool {
+func (A Application) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Application:
 		if len(A.Body) == len(B.Body) {
 			for i := 0; i < len(A.Body); i++ {
-				if !A.Body[i].EqualsExpr(B.Body[i]) {
+				if !A.Body[i].Equals(B.Body[i]) {
 					return false
 				}
 			}
@@ -108,10 +112,10 @@ func NewIf(c, t, f Expression) (If, error) {
 	}, nil
 }
 
-func (A If) EqualsExpr(b Expression) bool {
+func (A If) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case If:
-		return A.Condition.EqualsExpr(B.Condition) && A.Tbody.EqualsExpr(B.Tbody) && A.Fbody.EqualsExpr(B.Fbody)
+		return A.Condition.Equals(B.Condition) && A.Tbody.Equals(B.Tbody) && A.Fbody.Equals(B.Fbody)
 	}
 
 	return false
@@ -158,20 +162,20 @@ func NewPattern(m [][]Match, b []Expression) (Pattern, error) {
 	}, nil
 }
 
-func (A Pattern) EqualsExpr(b Expression) bool {
+func (A Pattern) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Pattern:
 		if len(A.Matches) == len(B.Matches) && (len(A.Matches) == 0 || len(A.Matches[0]) == len(B.Matches[0])) && len(A.Bodies) == len(B.Bodies) {
 			for i := 0; i < len(A.Matches); i++ {
 				for j := 0; j < len(A.Matches[i]); j++ {
-					if !A.Matches[i][j].EqualsMatch(B.Matches[i][j]) {
+					if !A.Matches[i][j].Equals(B.Matches[i][j]) {
 						return false
 					}
 				}
 			}
 
 			for i := 0; i < len(A.Bodies); i++ {
-				if !A.Bodies[i].EqualsExpr(B.Bodies[i]) {
+				if !A.Bodies[i].Equals(B.Bodies[i]) {
 					return false
 				}
 			}
@@ -228,16 +232,7 @@ func NewIdentifier(v string) (Identifier, error) {
 	}, nil
 }
 
-func (A Identifier) EqualsExpr(b Expression) bool {
-	switch B := b.(type) {
-	case Identifier:
-		return A.Value == B.Value
-	}
-
-	return false
-}
-
-func (A Identifier) EqualsMatch(b Match) bool {
+func (A Identifier) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Identifier:
 		return A.Value == B.Value
@@ -279,16 +274,7 @@ func NewLabel(v string) (Label, error) {
 	}, nil
 }
 
-func (A Label) EqualsExpr(b Expression) bool {
-	switch B := b.(type) {
-	case Label:
-		return A.Value == B.Value
-	}
-
-	return false
-}
-
-func (A Label) EqualsMatch(b Match) bool {
+func (A Label) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Label:
 		return A.Value == B.Value
@@ -330,16 +316,7 @@ func NewString(v string) (String, error) {
 	}, nil
 }
 
-func (A String) EqualsExpr(b Expression) bool {
-	switch B := b.(type) {
-	case String:
-		return A.Value == B.Value
-	}
-
-	return false
-}
-
-func (A String) EqualsMatch(b Match) bool {
+func (A String) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case String:
 		return A.Value == B.Value
@@ -381,16 +358,7 @@ func NewNumber(v int) (Number, error) {
 	}, nil
 }
 
-func (A Number) EqualsExpr(b Expression) bool {
-	switch B := b.(type) {
-	case Number:
-		return A.Value == B.Value
-	}
-
-	return false
-}
-
-func (A Number) EqualsMatch(b Match) bool {
+func (A Number) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Number:
 		return A.Value == B.Value
@@ -435,17 +403,17 @@ func NewLet(ids []Identifier, vs []Expression, b Expression) (Let, error) {
 	}, nil
 }
 
-func (A Let) EqualsExpr(b Expression) bool {
+func (A Let) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Let:
 		if len(A.BoundIds) == len(B.BoundIds) {
 			for i := 0; i < len(A.BoundIds); i++ {
-				if !A.BoundIds[i].EqualsExpr(B.BoundIds[i]) || !A.BoundValues[i].EqualsExpr(B.BoundValues[i]) {
+				if !A.BoundIds[i].Equals(B.BoundIds[i]) || !A.BoundValues[i].Equals(B.BoundValues[i]) {
 					return false
 				}
 			}
 
-			return A.Body.EqualsExpr(B.Body)
+			return A.Body.Equals(B.Body)
 		}
 	}
 
@@ -495,10 +463,10 @@ func NewWhere(i Identifier, c Expression) (Where, error) {
 	}, nil
 }
 
-func (A Where) EqualsMatch(b Match) bool {
+func (A Where) Equals(b interface{}) bool {
 	switch B := b.(type) {
 	case Where:
-		return A.Id.EqualsExpr(B.Id) && A.Condition.EqualsExpr(B.Condition)
+		return A.Id.Equals(B.Id) && A.Condition.Equals(B.Condition)
 	}
 
 	return false

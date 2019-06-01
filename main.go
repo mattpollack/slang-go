@@ -18,11 +18,14 @@ func main() {
 
 	src := []byte(
 		`
-let test = {
-  i j k -> (+ (+ i j) k)
+
+let fib = {
+  0 -> 1
+  1 -> 1
+  n -> (+ (fib (- n 1)) (fib (- n 2)))
 }
 
-(((test 1) 2) 3)
+(fib 10)
 
 `)
 	AST, err := ast.Parse(src)
@@ -34,12 +37,14 @@ let test = {
 
 	fmt.Println("\n---------------------------------------\n")
 
-	prog := compile.Compile(AST)
-	prog.Print()
-
-	fmt.Printf("\nSummary\n- Bytecode:\t %d bytes\n- Source:\t %d bytes\n", prog.Size(), len(src))
+	AST.Print(0)
 
 	if false {
+		prog := compile.Compile(AST)
+		prog.Print()
+
+		fmt.Printf("\nSummary\n- Bytecode:\t %d bytes\n- Source:\t %d bytes\n", prog.Size(), len(src))
+
 		fmt.Println("\n---------------------------------------\n")
 
 		run := vm.NewVM(prog.Render())
