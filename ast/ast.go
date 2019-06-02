@@ -18,10 +18,14 @@ type Equals interface {
 	Equals(interface{}) bool
 }
 
+// A bit of a misnomer
 type Expression interface {
 	Meta
 	Prints
 	Equals
+
+	Eval(Environment) Expression
+	Apply(Expression) Expression
 
 	IsExpression()
 }
@@ -32,6 +36,33 @@ type Match interface {
 	Equals
 
 	IsMatch()
+}
+
+// --------------------------------------------------------
+// See interpret.go
+
+type Environment struct {
+	Bound map[string]Expression
+}
+
+func NewEnvironment() Environment {
+	return Environment{map[string]Expression{}}
+}
+
+func (e Environment) Set(id string, val Expression) Environment {
+	e.Bound[id] = val
+
+	return e
+}
+
+func (e Environment) Get(id string) Expression {
+	return e.Bound[id]
+}
+
+func (e Environment) Unset(id string) Environment {
+	delete(e.Bound, id)
+
+	return e
 }
 
 // --------------------------------------------------------
@@ -149,6 +180,8 @@ type Pattern struct {
 	Matches [][]Match
 	Bodies  []Expression
 
+	env Environment
+
 	meta interface{}
 }
 
@@ -158,6 +191,7 @@ func NewPattern(m [][]Match, b []Expression) (Pattern, error) {
 	return Pattern{
 		m,
 		b,
+		NewEnvironment(),
 		nil,
 	}, nil
 }

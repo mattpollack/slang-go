@@ -42,6 +42,14 @@ func (e BoundValue) MetaSet(meta interface{}) interface{} {
 	return e
 }
 
+func (e BoundValue) Eval(ast.Environment) ast.Expression {
+	return e
+}
+
+func (e BoundValue) Apply(ast.Expression) ast.Expression {
+	return e
+}
+
 func (e BoundValue) Print(tab int) {
 	ast.PrintTab(tab)
 	fmt.Printf("arg[%d]\n", e.Index)

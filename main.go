@@ -25,7 +25,10 @@ let fib = {
   n -> (+ (fib (- n 1)) (fib (- n 2)))
 }
 
-(fib 10)
+if (eql (fib 10) 89)
+  (print "derp")
+else
+  (print "herp")
 
 `)
 	AST, err := ast.Parse(src)
@@ -35,8 +38,8 @@ let fib = {
 		return
 	}
 
-	fmt.Println("\n---------------------------------------\n")
-
+	AST = ast.Interpret(AST)
+	fmt.Println("\n---------------------------------------\nAST:\n")
 	AST.Print(0)
 
 	if false {
