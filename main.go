@@ -20,7 +20,10 @@ func main() {
 		`
 
 let range = {
-  min (max : (> max min)) (v : (&& (>= v min) (< v max)))
+  min
+  max : (> max min)
+  v   : (&& (>= v min) (< v max))
+
   -> .true
   => .false
 }
@@ -36,8 +39,9 @@ let _ = (do
     .i   -> 10
   }
   {
-    (s : (> (s.i) 0))
-    -> let _ = (print (s.i)) { .end -> .false .i -> (- (s.i) 1) }
+    s : (> (s.i) 0)
+    -> let _ = (print (s.i))
+       { .end -> .false .i -> (- (s.i) 1) }
     => { .end -> .true }
   }
 )

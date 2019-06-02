@@ -415,18 +415,8 @@ func (p *parser) Let() (Expression, error) {
 	}
 }
 
-func (p *parser) Where() (Match, error) {
+func (p *parser) Where(id Identifier) (Match, error) {
 	m := NewMark(p)
-
-	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
-		return nil, m.Error("Where must be enclosed by parenthesis '(' ')'")
-	}
-
-	id, err := p.Identifier()
-
-	if err != nil {
-		return nil, m.Error(err.Error())
-	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
 		return nil, m.Error("Colon must separate where identifier from body")
@@ -438,11 +428,7 @@ func (p *parser) Where() (Match, error) {
 		return nil, m.Error("Where must have a body")
 	}
 
-	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
-		return nil, m.Error("Where must be enclosed by parenthesis '(' ')'")
-	}
-
-	return NewWhere(id.(Identifier), body)
+	return NewWhere(id, body)
 }
 
 func (p *parser) Application() (Expression, error) {
@@ -522,11 +508,22 @@ func (p *parser) Match() (Match, error) {
 	m := NewMark(p)
 
 	switch p.Peek().kind {
+	// Could be where or identifier
 	case TOKEN_KIND_IDENTIFIER:
 		m, err := p.Identifier()
 
 		if err != nil {
 			return nil, err
+		}
+
+		if p.Peek().kind == TOKEN_KIND_COLON {
+			m, err := p.Where(m.(Identifier))
+
+			if err != nil {
+				return nil, err
+			}
+
+			return m, nil
 		}
 
 		return m.(Identifier), nil
@@ -554,14 +551,16 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(Number), nil
-	case TOKEN_KIND_PAREN_OPEN:
-		m, err := p.Where()
+		/*
+			case TOKEN_KIND_PAREN_OPEN:
+				m, err := p.Where()
 
-		if err != nil {
-			return nil, err
-		}
+				if err != nil {
+					return nil, err
+				}
 
-		return m, nil
+				return m, nil
+		*/
 	default:
 		return nil, m.Error("Unexpected error occured when parsing match")
 	}
