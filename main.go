@@ -42,7 +42,7 @@ let _ = (do
   }
 )
 
-(print "todo")
+(print "test")
 `)
 	AST, err := ast.Parse(src)
 
