@@ -19,17 +19,30 @@ func main() {
 	src := []byte(
 		`
 
-let fib = {
-  0 -> 1
-  1 -> 1
-  n -> (+ (fib (- n 1)) (fib (- n 2)))
+let range = {
+  min (max : (> max min)) (v : (&& (>= v min) (< v max)))
+  -> .true
+  => .false
 }
 
-if (eql (fib 10) 89)
-  (print "derp")
-else
-  (print "herp")
+let do = {
+  s : (s.end) _  -> s
+  s           fn -> (do (fn s) fn)
+}
 
+let _ = (do
+  {
+    .end -> .false
+    .i   -> 10
+  }
+  {
+    (s : (> (s.i) 0))
+    -> let _ = (print (s.i)) { .end -> .false .i -> (- (s.i) 1) }
+    => { .end -> .true }
+  }
+)
+
+(print "todo")
 `)
 	AST, err := ast.Parse(src)
 

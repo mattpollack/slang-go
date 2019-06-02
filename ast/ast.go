@@ -481,7 +481,7 @@ func (node Let) Print(tab int) {
 // --------------------------------------------------------
 
 type Where struct {
-	Id        Expression
+	Id        Identifier
 	Condition Expression
 
 	meta interface{}

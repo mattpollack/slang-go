@@ -15,6 +15,7 @@ const (
 	TOKEN_KIND_BRACE_CLOSE
 	TOKEN_KIND_PAREN_OPEN
 	TOKEN_KIND_PAREN_CLOSE
+	TOKEN_KIND_FAT_ARROW
 	TOKEN_KIND_EQUAL
 	TOKEN_KIND_ARROW
 	TOKEN_KIND_LET
@@ -134,8 +135,25 @@ func (p *parser) Next() token {
 		}
 	}
 
+	// Parse reserved identifiers 1
+	for _, s := range []string{"=="} {
+		if bytes.HasPrefix(p.src, []byte(s)) {
+			token := token{
+				TOKEN_KIND_IDENTIFIER,
+				[]byte(s),
+				p.line,
+				p.char,
+			}
+
+			p.char += len(s)
+			p.src = p.src[len(s):]
+
+			return token
+		}
+	}
+
 	// Parse reserved
-	for i, s := range []string{"{", "}", "(", ")", "=", "->", "let", "if", "else", ":"} {
+	for i, s := range []string{"{", "}", "(", ")", "=>", "=", "->", "let", "if", "else", ":"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_BRACE_OPEN + i,
@@ -151,8 +169,8 @@ func (p *parser) Next() token {
 		}
 	}
 
-	// Parse reserved identifiers
-	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "||", "&&"} {
+	// Parse reserved identifiers 2
+	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "==", "||", "&&"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_IDENTIFIER,
@@ -462,14 +480,25 @@ func (p *parser) Pattern() (Expression, error) {
 	for !p.ConsumeIfNext(TOKEN_KIND_BRACE_CLOSE) {
 		matches := []Match{}
 
-		for !p.ConsumeIfNext(TOKEN_KIND_ARROW) {
-			match, err := p.Match()
-
-			if err != nil {
-				return nil, err
+		if p.ConsumeIfNext(TOKEN_KIND_FAT_ARROW) {
+			if len(matchBodies) == 0 {
+				return nil, errors.New("Default pattern match cannot be the first body")
 			}
 
-			matches = append(matches, match)
+			for range matchBodies[0] {
+				id, _ := NewIdentifier("_")
+				matches = append(matches, id)
+			}
+		} else {
+			for !p.ConsumeIfNext(TOKEN_KIND_ARROW) {
+				match, err := p.Match()
+
+				if err != nil {
+					return nil, err
+				}
+
+				matches = append(matches, match)
+			}
 		}
 
 		body, err := p.Expression()

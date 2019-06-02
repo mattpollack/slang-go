@@ -4,10 +4,22 @@ import (
 	"fmt"
 )
 
+func Interpret(expr Expression) Expression {
+	env := NewEnvironment()
+
+	for k, fn := range builtin {
+		env = env.Set(k, NewNative(fn))
+	}
+
+	return expr.Eval(env)
+}
+
+// --------------------------------------------------------
+
 var True = Label{Value: "true"}
 var False = Label{Value: "false"}
 
-var global = map[string]func(Expression) Expression{
+var builtin = map[string]func(Expression) Expression{
 	"+": func(arg Expression) Expression {
 		switch A0 := arg.(type) {
 		case Number:
@@ -38,7 +50,83 @@ var global = map[string]func(Expression) Expression{
 
 		panic("Mismatching types passed to '-'")
 	},
-	"eql": func(a0 Expression) Expression {
+	">": func(arg Expression) Expression {
+		switch A0 := arg.(type) {
+		case Number:
+			return NewNative(func(arg Expression) Expression {
+				switch A1 := arg.(type) {
+				case Number:
+					if A0.Value > A1.Value {
+						return True
+					} else {
+						return False
+					}
+				}
+
+				panic("Mismatching types passed to '-'")
+			})
+		}
+
+		panic("Mismatching types passed to '-'")
+	},
+	">=": func(arg Expression) Expression {
+		switch A0 := arg.(type) {
+		case Number:
+			return NewNative(func(arg Expression) Expression {
+				switch A1 := arg.(type) {
+				case Number:
+					if A0.Value >= A1.Value {
+						return True
+					} else {
+						return False
+					}
+				}
+
+				panic("Mismatching types passed to '-'")
+			})
+		}
+
+		panic("Mismatching types passed to '-'")
+	},
+	"<": func(arg Expression) Expression {
+		switch A0 := arg.(type) {
+		case Number:
+			return NewNative(func(arg Expression) Expression {
+				switch A1 := arg.(type) {
+				case Number:
+					if A0.Value < A1.Value {
+						return True
+					} else {
+						return False
+					}
+				}
+
+				panic("Mismatching types passed to '-'")
+			})
+		}
+
+		panic("Mismatching types passed to '-'")
+	},
+	"&&": func(arg Expression) Expression {
+		switch A0 := arg.(type) {
+		case Label:
+			return NewNative(func(arg Expression) Expression {
+				switch A1 := arg.(type) {
+				case Label:
+					if A0.Equals(True) && A1.Equals(True) {
+						return True
+					} else {
+						return False
+					}
+				}
+
+				panic("Mismatching types passed to '-'")
+			})
+		}
+
+		panic("Mismatching types passed to '-'")
+	},
+	"==": func(a0 Expression) Expression {
 		return NewNative(func(a1 Expression) Expression {
 			if a0.Equals(a1) {
 				return True
@@ -53,18 +141,6 @@ var global = map[string]func(Expression) Expression{
 		return arg
 	},
 }
-
-func Interpret(expr Expression) Expression {
-	env := NewEnvironment()
-
-	for k, fn := range global {
-		env = env.Set(k, NewNative(fn))
-	}
-
-	return expr.Eval(env)
-}
-
-// --------------------------------------------------------
 
 type Native struct {
 	fn  func(Expression) Expression
@@ -156,7 +232,21 @@ func (e Pattern) Apply(arg Expression) Expression {
 			res.env = res.env.Set(M.Value, arg)
 			res.Bodies = append(res.Bodies, e.Bodies[i])
 			res.Matches = append(res.Matches, e.Matches[i][1:])
+
 		case Number:
+			if M.Equals(arg) {
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			}
+
+		case Where:
+			if M.Condition.Eval(res.env.Set(M.Id.Value, arg)).Equals(True) {
+				res.env = res.env.Set(M.Id.Value, arg)
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			}
+
+		case Label:
 			if M.Equals(arg) {
 				res.Bodies = append(res.Bodies, e.Bodies[i])
 				res.Matches = append(res.Matches, e.Matches[i][1:])
@@ -194,8 +284,7 @@ func (e Identifier) Apply(arg Expression) Expression {
 }
 
 func (e Label) Eval(env Environment) Expression {
-	panic("e label")
-	return nil
+	return e
 }
 
 func (e Label) Apply(arg Expression) Expression {
