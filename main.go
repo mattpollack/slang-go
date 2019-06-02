@@ -20,10 +20,7 @@ func main() {
 		`
 
 let range = {
-  min
-  max : (> max min)
-  v   : (&& (>= v min) (< v max))
-
+  min max : (> max min) v : (&& (>= v min) (< v max))
   -> .true
   => .false
 }

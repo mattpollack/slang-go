@@ -551,16 +551,6 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(Number), nil
-		/*
-			case TOKEN_KIND_PAREN_OPEN:
-				m, err := p.Where()
-
-				if err != nil {
-					return nil, err
-				}
-
-				return m, nil
-		*/
 	default:
 		return nil, m.Error("Unexpected error occured when parsing match")
 	}
