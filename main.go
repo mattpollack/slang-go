@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"time"
 
 	"./ast"
@@ -19,21 +20,30 @@ func main() {
 		fmt.Println("\nExecution time:", time.Now().Sub(startTime))
 	}()
 
-	// Read in bootstrap
-	src, err := ioutil.ReadFile("bootstrap/main.sl")
+	switch len(os.Args) {
+	case 2:
+		src, err := ioutil.ReadFile(os.Args[1])
 
-	AST, err := ast.Parse(src)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+		AST, err := ast.Parse(src)
 
-	AST = ast.Interpret(AST)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-	if DEBUG {
-		fmt.Println("\n---------------------------------------\nAST:\n")
-		AST.Print(0)
+		AST = ast.Interpret(AST)
+
+		if DEBUG {
+			fmt.Println("\n---------------------------------------\nAST:\n")
+			AST.Print(0)
+		}
+	default:
+		fmt.Println("Unexpected number of args")
 	}
 }
 

@@ -24,8 +24,8 @@ type Expression interface {
 	Prints
 	Equals
 
-	Eval(Environment) Expression
-	Apply(Expression) Expression
+	Eval(Environment, bool) Expression
+	Apply(Expression, bool) Expression
 
 	IsExpression()
 }

@@ -11,7 +11,7 @@ func Interpret(expr Expression) Expression {
 		env = env.Set(k, NewNative(fn))
 	}
 
-	return expr.Eval(env)
+	return expr.Eval(env, false)
 }
 
 // --------------------------------------------------------
@@ -19,56 +19,64 @@ func Interpret(expr Expression) Expression {
 var True = Label{Value: "true"}
 var False = Label{Value: "false"}
 
-var builtin = map[string]func(Expression) Expression{
-	"+": func(arg Expression) Expression {
+func Panic(safe bool, msg string) Label {
+	if !safe {
+		panic(msg)
+	} else {
+		return Label{Value: "panic"}
+	}
+}
+
+var builtin = map[string]func(Expression, bool) Expression{
+	"+": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					return Number{Value: A0.Value + A1.Value}
 				}
 
-				panic("Mismatching types passed to '+'")
+				return Panic(safe, "Mismatching types passed to '+'")
 			})
 		}
 
-		panic("Mismatching types passed to '+'")
+		return Panic(safe, "Mismatching types passed to '+'")
 	},
-	"-": func(arg Expression) Expression {
+	"-": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					return Number{Value: A0.Value - A1.Value}
 				}
 
-				panic("Mismatching types passed to '-'")
+				return Panic(safe, "Mismatching types passed to '-'")
 			})
 		}
 
-		panic("Mismatching types passed to '-'")
+		return Panic(safe, "Mismatching types passed to '-'")
 	},
-	"*": func(arg Expression) Expression {
+	"*": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					return Number{Value: A0.Value * A1.Value}
 				}
 
-				panic("Mismatching types passed to '*'")
+				return Panic(safe, "Mismatching types passed to '*'")
 			})
 		}
 
-		panic("Mismatching types passed to '*'")
+		return Panic(safe, "Mismatching types passed to '*'")
 	},
-	">": func(arg Expression) Expression {
+	">": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					if A0.Value > A1.Value {
@@ -78,16 +86,16 @@ var builtin = map[string]func(Expression) Expression{
 					}
 				}
 
-				panic("Mismatching types passed to '>'")
+				return Panic(safe, "Mismatching types passed to '>'")
 			})
 		}
 
-		panic("Mismatching types passed to '>'")
+		return Panic(safe, "Mismatching types passed to '>'")
 	},
-	">=": func(arg Expression) Expression {
+	">=": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					if A0.Value >= A1.Value {
@@ -97,16 +105,16 @@ var builtin = map[string]func(Expression) Expression{
 					}
 				}
 
-				panic("Mismatching types passed to '>='")
+				return Panic(safe, "Mismatching types passed to '>='")
 			})
 		}
 
-		panic("Mismatching types passed to '>='")
+		return Panic(safe, "Mismatching types passed to '>='")
 	},
-	"<": func(arg Expression) Expression {
+	"<": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Number:
 					if A0.Value < A1.Value {
@@ -116,13 +124,13 @@ var builtin = map[string]func(Expression) Expression{
 					}
 				}
 
-				panic("Mismatching types passed to '<'")
+				return Panic(safe, "Mismatching types passed to '<'")
 			})
 		}
 
-		panic("Mismatching types passed to '<'")
+		return Panic(safe, "Mismatching types passed to '<'")
 	},
-	"abs": func(arg Expression) Expression {
+	"abs": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Number:
 			if A0.Value < 0 {
@@ -132,12 +140,12 @@ var builtin = map[string]func(Expression) Expression{
 			return A0
 		}
 
-		panic("Mismatching types passed to 'abs'")
+		return Panic(safe, "Mismatching types passed to 'abs'")
 	},
-	"&&": func(arg Expression) Expression {
+	"&&": func(arg Expression, safe bool) Expression {
 		switch A0 := arg.(type) {
 		case Label:
-			return NewNative(func(arg Expression) Expression {
+			return NewNative(func(arg Expression, safe bool) Expression {
 				switch A1 := arg.(type) {
 				case Label:
 					if A0.Equals(True) && A1.Equals(True) {
@@ -147,14 +155,14 @@ var builtin = map[string]func(Expression) Expression{
 					}
 				}
 
-				panic("Mismatching types passed to '-'")
+				return Panic(safe, "Mismatching types passed to '-'")
 			})
 		}
 
-		panic("Mismatching types passed to '-'")
+		return Panic(safe, "Mismatching types passed to '-'")
 	},
-	"==": func(a0 Expression) Expression {
-		return NewNative(func(a1 Expression) Expression {
+	"==": func(a0 Expression, safe bool) Expression {
+		return NewNative(func(a1 Expression, safe bool) Expression {
 			if a0.Equals(a1) {
 				return True
 			} else {
@@ -162,7 +170,7 @@ var builtin = map[string]func(Expression) Expression{
 			}
 		})
 	},
-	"print": func(arg Expression) Expression {
+	"print": func(arg Expression, safe bool) Expression {
 		switch A := arg.(type) {
 		case Number:
 			fmt.Print(A.Value)
@@ -175,7 +183,7 @@ var builtin = map[string]func(Expression) Expression{
 		case Pattern:
 			l, _ := NewLabel("print")
 
-			if p := A.Apply(l); p != nil {
+			if p := A.Apply(l, safe); p != nil {
 				return p
 			}
 
@@ -186,7 +194,7 @@ var builtin = map[string]func(Expression) Expression{
 
 		return arg
 	},
-	"print_ast": func(arg Expression) Expression {
+	"print_ast": func(arg Expression, safe bool) Expression {
 		arg.Print(0)
 
 		return arg
@@ -194,11 +202,11 @@ var builtin = map[string]func(Expression) Expression{
 }
 
 type Native struct {
-	fn  func(Expression) Expression
+	fn  func(Expression, bool) Expression
 	env Environment
 }
 
-func NewNative(fn func(Expression) Expression) Native {
+func NewNative(fn func(Expression, bool) Expression) Native {
 	return Native{fn, NewEnvironment()}
 }
 
@@ -208,13 +216,12 @@ func (e Native) Equals(b interface{}) bool {
 	return false
 }
 
-func (e Native) Eval(env Environment) Expression {
+func (e Native) Eval(Environment, bool) Expression {
 	panic("e :(")
-	return nil
 }
 
-func (e Native) Apply(arg Expression) Expression {
-	return e.fn(arg)
+func (e Native) Apply(arg Expression, safe bool) Expression {
+	return e.fn(arg, safe)
 }
 
 func (e Native) MetaGet() interface{} {
@@ -232,62 +239,62 @@ func (e Native) Print(tab int) {
 
 // --------------------------------------------------------
 
-func (e Slice) Eval(env Environment) Expression {
+func (e Slice) Eval(env Environment, safe bool) Expression {
 	if e.Low != nil {
-		e.Low = e.Low.Eval(env)
+		e.Low = e.Low.Eval(env, safe)
 
 		switch e.Low.(type) {
 		case Number:
 		default:
-			panic("Slice low value must be a number")
+			return Panic(safe, "Slice low value must be a number")
 		}
 	}
 
 	if e.High != nil {
-		e.High = e.High.Eval(env)
+		e.High = e.High.Eval(env, safe)
 
 		switch e.High.(type) {
 		case Number:
 		default:
-			panic("Slice high value must be a number")
+			return Panic(safe, "Slice high value must be a number")
 		}
 	}
 
 	return e
 }
 
-func (e Slice) Apply(arg Expression) Expression {
+func (e Slice) Apply(arg Expression, safe bool) Expression {
 	// Apply the reverse
-	return arg.Apply(e)
+	return arg.Apply(e, safe)
 }
 
-func (e Application) Eval(env Environment) Expression {
-	result := e.Body[0].Eval(env)
+func (e Application) Eval(env Environment, safe bool) Expression {
+	result := e.Body[0].Eval(env, safe)
 
 	if len(e.Body) == 1 {
 		return result
 	}
 
 	for _, expr := range e.Body[1:] {
-		result = result.Apply(expr.Eval(env))
+		result = result.Apply(expr.Eval(env, safe), safe)
 	}
 
 	return result
 }
 
-func (e Application) Apply(arg Expression) Expression {
+func (e Application) Apply(arg Expression, safe bool) Expression {
 	panic("Applications aren't values")
 }
 
-func (e List) Eval(env Environment) Expression {
+func (e List) Eval(env Environment, safe bool) Expression {
 	for i, _ := range e.Values {
-		e.Values[i] = e.Values[i].Eval(env)
+		e.Values[i] = e.Values[i].Eval(env, safe)
 	}
 
 	return e
 }
 
-func (e List) Apply(arg Expression) Expression {
+func (e List) Apply(arg Expression, safe bool) Expression {
 	switch A := arg.(type) {
 	case Label:
 		if A.Value == "len" {
@@ -309,26 +316,26 @@ func (e List) Apply(arg Expression) Expression {
 	}
 }
 
-func (e If) Eval(env Environment) Expression {
-	if e.Condition.Eval(env).Equals(True) {
-		return e.Tbody.Eval(env)
+func (e If) Eval(env Environment, safe bool) Expression {
+	if e.Condition.Eval(env, safe).Equals(True) {
+		return e.Tbody.Eval(env, safe)
 	} else {
-		return e.Fbody.Eval(env)
+		return e.Fbody.Eval(env, safe)
 	}
 }
 
-func (e If) Apply(arg Expression) Expression {
+func (e If) Apply(arg Expression, safe bool) Expression {
 	panic("a if")
 	return nil
 }
 
-func (e Pattern) Eval(env Environment) Expression {
+func (e Pattern) Eval(env Environment, safe bool) Expression {
 	e.env = env
 
 	return e
 }
 
-func (e Pattern) Apply(arg Expression) Expression {
+func (e Pattern) Apply(arg Expression, safe bool) Expression {
 	res, _ := NewPattern([][]Match{}, []Expression{})
 
 	// Copy env (move to method?)
@@ -361,7 +368,7 @@ func (e Pattern) Apply(arg Expression) Expression {
 			}
 
 		case Where:
-			if M.Condition.Eval(res.env.Set(M.Id.Value, arg)).Equals(True) {
+			if M.Condition.Eval(res.env.Set(M.Id.Value, arg), true).Equals(True) {
 				res.env = res.env.Set(M.Id.Value, arg)
 				res.Bodies = append(res.Bodies, e.Bodies[i])
 				res.Matches = append(res.Matches, e.Matches[i][1:])
@@ -494,7 +501,7 @@ func (e Pattern) Apply(arg Expression) Expression {
 				}
 
 			default:
-				panic("Cannot match list construtor to value of this type")
+				Panic(true, "Cannot match list construtor to value of this type")
 			}
 
 		default:
@@ -503,45 +510,45 @@ func (e Pattern) Apply(arg Expression) Expression {
 	}
 
 	if len(res.Matches) == 0 {
-		panic("Failed to match argument to pattern")
+		return Panic(safe, "Failed to match argument to pattern")
 	}
 
 	if len(res.Matches[0]) == 0 {
-		return res.Bodies[0].Eval(res.env)
+		return res.Bodies[0].Eval(res.env, false)
 	}
 
 	return res
 }
 
-func (e Identifier) Eval(env Environment) Expression {
+func (e Identifier) Eval(env Environment, safe bool) Expression {
 	res := env.Get(e.Value)
 
 	if res == nil {
-		panic(fmt.Sprintf("Cannot find identifier '%s'", e.Value))
+		return Panic(safe, fmt.Sprintf("Cannot find identifier '%s'", e.Value))
 	}
 
 	return res
 }
 
-func (e Identifier) Apply(arg Expression) Expression {
+func (e Identifier) Apply(arg Expression, safe bool) Expression {
 	panic("a identifier")
 	return nil
 }
 
-func (e Label) Eval(env Environment) Expression {
+func (e Label) Eval(Environment, bool) Expression {
 	return e
 }
 
-func (e Label) Apply(arg Expression) Expression {
+func (e Label) Apply(arg Expression, safe bool) Expression {
 	panic("a label")
 	return nil
 }
 
-func (e String) Eval(env Environment) Expression {
+func (e String) Eval(Environment, bool) Expression {
 	return e
 }
 
-func (e String) Apply(arg Expression) Expression {
+func (e String) Apply(arg Expression, safe bool) Expression {
 	switch A := arg.(type) {
 	case Label:
 		switch A.Value {
@@ -579,32 +586,32 @@ func (e String) Apply(arg Expression) Expression {
 	}
 }
 
-func (e Number) Eval(env Environment) Expression {
+func (e Number) Eval(Environment, bool) Expression {
 	return e
 }
 
-func (e Number) Apply(arg Expression) Expression {
+func (e Number) Apply(arg Expression, safe bool) Expression {
 	panic("a number")
 	return nil
 }
 
-func (e Let) Eval(env Environment) Expression {
+func (e Let) Eval(env Environment, safe bool) Expression {
 	for i, id := range e.BoundIds {
-		env = env.Set(id.Value, e.BoundValues[i].Eval(env))
+		env = env.Set(id.Value, e.BoundValues[i].Eval(env, safe))
 	}
 
-	return e.Body.Eval(env)
+	return e.Body.Eval(env, safe)
 }
 
-func (e Let) Apply(arg Expression) Expression {
+func (e Let) Apply(arg Expression, safe bool) Expression {
 	panic("a let")
 	return nil
 }
 
-func (m Where) Eval(env Environment) {
+func (m Where) Eval(Environment, bool) {
 	panic("e where")
 }
 
-func (m Where) Apply(arg Expression) Expression {
+func (m Where) Apply(arg Expression, safe bool) Expression {
 	panic("a where")
 }
