@@ -50,7 +50,9 @@ func NewEnvironment() Environment {
 }
 
 func (e Environment) Set(id string, val Expression) Environment {
-	e.Bound[id] = val
+	if id != "_" {
+		e.Bound[id] = val
+	}
 
 	return e
 }

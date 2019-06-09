@@ -26,12 +26,6 @@ const (
 	TOKEN_KIND_ELSE
 	TOKEN_KIND_COLON
 
-	// These aren't actually kinds, but are special identifiers
-	TOKEN_KIND_MINUS
-	TOKEN_KIND_PLUS
-	TOKEN_KIND_STAR
-	TOKEN_KIND_SLASH_F
-
 	TOKEN_KIND_IDENTIFIER
 	TOKEN_KIND_LABEL
 	TOKEN_KIND_STRING
@@ -173,7 +167,7 @@ func (p *parser) Next() token {
 	}
 
 	// Parse reserved identifiers 2
-	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "==", "||", "&&"} {
+	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "||", "&&"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_IDENTIFIER,

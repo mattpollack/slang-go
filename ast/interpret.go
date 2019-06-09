@@ -170,6 +170,18 @@ var builtin = map[string]func(Expression) Expression{
 			fmt.Print(A.Value)
 		case Label:
 			fmt.Print(A.Value)
+
+		// Only print patterns if they respond to ".print"
+		case Pattern:
+			l, _ := NewLabel("print")
+
+			if p := A.Apply(l); p != nil {
+				return p
+			}
+
+		default:
+			arg.Print(0)
+			panic("TODO print value of this type")
 		}
 
 		return arg
@@ -268,11 +280,33 @@ func (e Application) Apply(arg Expression) Expression {
 }
 
 func (e List) Eval(env Environment) Expression {
+	for i, _ := range e.Values {
+		e.Values[i] = e.Values[i].Eval(env)
+	}
+
 	return e
 }
 
 func (e List) Apply(arg Expression) Expression {
-	panic("list apply")
+	switch A := arg.(type) {
+	case Label:
+		if A.Value == "len" {
+			n, _ := NewNumber(len(e.Values))
+			return n
+		}
+
+		if A.Value == "head" {
+			return e.Values[0]
+		}
+
+		if A.Value == "tail" {
+			return List{Values: e.Values[1:]}
+		}
+
+		panic(fmt.Sprintf("List doesn't respond to .%s", A.Value))
+	default:
+		panic("Cannot apply this type to list")
+	}
 }
 
 func (e If) Eval(env Environment) Expression {
@@ -305,9 +339,14 @@ func (e Pattern) Apply(arg Expression) Expression {
 	for i, match := range e.Matches {
 		switch M := match[0].(type) {
 		case Identifier:
-			res.env = res.env.Set(M.Value, arg)
-			res.Bodies = append(res.Bodies, e.Bodies[i])
-			res.Matches = append(res.Matches, e.Matches[i][1:])
+			if v := res.env.Get(M.Value); v == nil {
+				res.env = res.env.Set(M.Value, arg)
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			} else if v.Equals(arg) {
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			}
 
 		case Number:
 			if M.Equals(arg) {
@@ -345,14 +384,23 @@ func (e Pattern) Apply(arg Expression) Expression {
 				// Match first value to head
 				switch Head := M.Head.(type) {
 				case Identifier:
-					if len(A.Value) > 0 {
+					if v := res.env.Get(Head.Value); v == nil && len(A.Value) > 0 {
 						sets = append(sets, func() {
 							res.env = res.env.Set(Head.Value, String{Value: A.Value[:1]})
 						})
 
 						headOffset = 1
 						head = true
+					} else {
+						switch V := v.(type) {
+						case String:
+							if len(A.Value) >= len(V.Value) && V.Equals(String{Value: A.Value[:len(V.Value)]}) {
+								headOffset = len(V.Value)
+								head = true
+							}
+						}
 					}
+
 				case String:
 					if len(A.Value) >= len(Head.Value) && M.Head.Equals(String{Value: A.Value[:len(Head.Value)]}) {
 						headOffset = len(Head.Value)
@@ -367,11 +415,21 @@ func (e Pattern) Apply(arg Expression) Expression {
 				// Match the rest of the values to tail
 				switch Tail := M.Tail.(type) {
 				case Identifier:
-					sets = append(sets, func() {
-						res.env = res.env.Set(Tail.Value, String{Value: A.Value[headOffset:]})
-					})
+					if v := res.env.Get(Tail.Value); v == nil {
+						sets = append(sets, func() {
+							res.env = res.env.Set(Tail.Value, String{Value: A.Value[headOffset:]})
+						})
 
-					tail = true
+						tail = true
+					} else {
+						switch V := v.(type) {
+						case String:
+							if V.Equals(String{Value: A.Value[headOffset:]}) {
+								headOffset = len(V.Value)
+								head = true
+							}
+						}
+					}
 				default:
 					if Tail.Equals(String{Value: A.Value[headOffset:]}) {
 						tail = true
