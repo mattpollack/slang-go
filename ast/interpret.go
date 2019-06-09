@@ -23,7 +23,7 @@ func Panic(safe bool, msg string) Label {
 	if !safe {
 		panic(msg)
 	} else {
-		return Label{Value: "panic"}
+		return Label{Value: "false"}
 	}
 }
 
@@ -188,7 +188,6 @@ var builtin = map[string]func(Expression, bool) Expression{
 			}
 
 		default:
-			arg.Print(0)
 			panic("TODO print value of this type")
 		}
 
@@ -380,7 +379,27 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 				res.Matches = append(res.Matches, e.Matches[i][1:])
 			}
 
+		case List:
+			if M.Equals(arg) {
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			}
+
 		case ListConstructor:
+			// Evaluate non-special cases for the head value
+			switch M.Head.(type) {
+			case Application:
+				M.Head = M.Head.Eval(res.env, true)
+			}
+
+			// Evaluate non-special cases for the tail value
+			switch M.Tail.(type) {
+			case Application:
+				M.Tail = M.Tail.Eval(res.env, true)
+			}
+
+			// NOTE: possibly redo this, it's a bit everywhere
+
 			switch A := arg.(type) {
 			case String:
 				sets := []func(){}
@@ -501,7 +520,7 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 				}
 
 			default:
-				Panic(true, "Cannot match list construtor to value of this type")
+				Panic(true, "Cannot match list constructor to value of this type")
 			}
 
 		default:
@@ -510,6 +529,14 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 	}
 
 	if len(res.Matches) == 0 {
+		fmt.Println("Argument:")
+		arg.Print(1)
+		fmt.Println()
+		fmt.Println("Pattern:")
+		e.Print(1)
+		fmt.Println()
+		fmt.Println()
+
 		return Panic(safe, "Failed to match argument to pattern")
 	}
 
@@ -556,7 +583,7 @@ func (e String) Apply(arg Expression, safe bool) Expression {
 			num, _ := NewNumber(len(e.Value))
 			return num
 		default:
-			panic("Invalid label applied to string")
+			return Panic(safe, "Invalid label applied to string")
 		}
 
 	case Slice:
@@ -582,7 +609,7 @@ func (e String) Apply(arg Expression, safe bool) Expression {
 		return e
 
 	default:
-		panic("Invalid type applied to string")
+		return Panic(safe, "Invalid type applied to string")
 	}
 }
 

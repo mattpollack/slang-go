@@ -22,6 +22,12 @@ func main() {
 
 	switch len(os.Args) {
 	case 2:
+		defer func() {
+			if err := recover(); err != nil {
+				fmt.Printf("Runtime Error (%s)\n", err)
+			}
+		}()
+
 		src, err := ioutil.ReadFile(os.Args[1])
 
 		if err != nil {

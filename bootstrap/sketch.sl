@@ -1,8 +1,8 @@
-# This shouldn't cause a fail to match arguments
-# Create a shortcut...
-let derp = {
-  s : (s.derp) -> .false
-  s : (s.herp) -> .true
+let test = {
+  [(+ 0 1):[]] -> (print "ok cool\n")
+  [x:xs] -> (print "ok dope\n")
 }
 
-(print_ast (derp { .herp -> .true }))
+let _ = (test [1 2])
+let _ = (test [1])
+(print "ok")

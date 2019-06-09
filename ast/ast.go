@@ -331,7 +331,7 @@ func (e Label) MetaSet(meta interface{}) interface{} {
 
 func (node Label) Print(tab int) {
 	printTab(tab)
-	fmt.Print(node.Value)
+	fmt.Printf(".%s", node.Value)
 }
 
 // --------------------------------------------------------
@@ -417,7 +417,22 @@ func (e List) IsExpression() {}
 func (e List) IsMatch()      {}
 
 func (A List) Equals(b interface{}) bool {
-	panic("TODO list equals")
+	switch B := b.(type) {
+	case List:
+		if len(A.Values) != len(B.Values) {
+			return false
+		}
+
+		for i := 0; i < len(A.Values); i++ {
+			if !A.Values[i].Equals(B.Values[i]) {
+				return false
+			}
+		}
+
+		return true
+	default:
+		return false
+	}
 }
 
 func (e List) MetaGet() interface{} {

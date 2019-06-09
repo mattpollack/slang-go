@@ -22,6 +22,7 @@ const (
 	TOKEN_KIND_EQUAL
 	TOKEN_KIND_ARROW
 	TOKEN_KIND_LET
+	TOKEN_KIND_MATCH
 	TOKEN_KIND_IF
 	TOKEN_KIND_ELSE
 	TOKEN_KIND_COLON
@@ -150,7 +151,7 @@ func (p *parser) Next() token {
 	}
 
 	// Parse reserved
-	for i, s := range []string{"{", "}", "(", ")", "[", "]", "=>", "=", "->", "let", "if", "else", ":"} {
+	for i, s := range []string{"{", "}", "(", ")", "[", "]", "=>", "=", "->", "let", "match", "if", "else", ":"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_BRACE_OPEN + i,
@@ -319,6 +320,8 @@ func (p *parser) String() (Expression, error) {
 			switch {
 			case strings.HasPrefix(str[i:], "\\n"):
 				str = str[:i] + "\n" + str[i+2:]
+			case strings.HasPrefix(str[i:], "\\t"):
+				str = str[:i] + "\t" + str[i+2:]
 			}
 		}
 
@@ -375,6 +378,28 @@ func (p *parser) If() (Expression, error) {
 	return NewIf(condition, tbody, fbody)
 }
 
+func (p *parser) MatchExpr() (Expression, error) {
+	m := NewMark(p)
+
+	if !p.ConsumeIfNext(TOKEN_KIND_MATCH) {
+		return nil, m.Error("Match must begin with 'match'")
+	}
+
+	toMatch, err := p.Expression()
+
+	if err != nil {
+		return nil, err
+	}
+
+	with, err := p.Pattern()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return NewApplication([]Expression{with, toMatch})
+}
+
 func (p *parser) Let() (Expression, error) {
 	m := NewMark(p)
 
@@ -422,15 +447,10 @@ func (p *parser) Let() (Expression, error) {
 }
 
 func (p *parser) List(first Expression) (Expression, error) {
-	m := NewMark(p)
 	list := List{}
 
 	// Because lists and list constructors share their starts
-	if first == nil {
-		if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_OPEN) {
-			return nil, m.Error("Lists must be enclosed by brackets '[', ']'")
-		}
-	} else {
+	if first != nil {
 		list.Values = append(list.Values, first)
 	}
 
@@ -674,6 +694,16 @@ func (p *parser) Match() (Match, error) {
 	case TOKEN_KIND_BRACKET_OPEN:
 		p.Next()
 
+		if p.Peek().kind == TOKEN_KIND_BRACKET_CLOSE {
+			m, err := p.List(nil)
+
+			if err != nil {
+				return nil, err
+			}
+
+			return m.(List), nil
+		}
+
 		if p.Peek().kind == TOKEN_KIND_COLON {
 			return nil, errors.New("List constructor cannot have an empty head value")
 		}
@@ -724,6 +754,10 @@ func (p *parser) Expression() (Expression, error) {
 		return p.Let()
 	}
 
+	if p.Peek().kind == TOKEN_KIND_MATCH {
+		return p.MatchExpr()
+	}
+
 	if p.Peek().kind == TOKEN_KIND_BRACE_OPEN {
 		return p.Pattern()
 	}
@@ -734,12 +768,14 @@ func (p *parser) Expression() (Expression, error) {
 
 	// Lists and list constructors: open bracket and an expression
 	if p.Peek().kind == TOKEN_KIND_BRACKET_OPEN {
+		p.Next()
 		return p.List(nil)
 	}
 
-	if p.Peek().kind == TOKEN_KIND_IF {
-		return p.If()
-	}
+	// Disabled for now
+	//if p.Peek().kind == TOKEN_KIND_IF {
+	//	return p.If()
+	//}
 
 	return nil, m.Error("Unexpected error occured when parsing an expression")
 }
