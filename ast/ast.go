@@ -376,6 +376,111 @@ func (node String) Print(tab int) {
 
 // --------------------------------------------------------
 
+type Slice struct {
+	Low  Expression
+	High Expression
+
+	meta interface{}
+}
+
+func (e Slice) IsExpression() {}
+
+func (A Slice) Equals(b interface{}) bool {
+	panic("TODO slice equals")
+}
+
+func (e Slice) MetaGet() interface{} {
+	return e.meta
+}
+
+func (e Slice) MetaSet(meta interface{}) interface{} {
+	e.meta = meta
+
+	return e
+}
+
+func (node Slice) Print(tab int) {
+	panic("TODO print slice")
+}
+
+// --------------------------------------------------------
+
+type List struct {
+	Values []Expression
+
+	meta interface{}
+}
+
+func (e List) IsExpression() {}
+func (e List) IsMatch()      {}
+
+func (A List) Equals(b interface{}) bool {
+	panic("TODO list equals")
+}
+
+func (e List) MetaGet() interface{} {
+	return e.meta
+}
+
+func (e List) MetaSet(meta interface{}) interface{} {
+	e.meta = meta
+
+	return e
+}
+
+func (node List) Print(tab int) {
+	printTab(tab)
+	fmt.Println("[")
+
+	for _, val := range node.Values {
+		val.Print(tab + 1)
+	}
+
+	printTab(tab)
+	fmt.Println("]")
+}
+
+// --------------------------------------------------------
+
+type ListConstructor struct {
+	Head Expression
+	Tail Expression
+
+	meta interface{}
+}
+
+func (e ListConstructor) IsExpression() {}
+func (e ListConstructor) IsMatch()      {}
+
+func (A ListConstructor) Equals(b interface{}) bool {
+	panic("TODO list constructor equals")
+}
+
+func (e ListConstructor) MetaGet() interface{} {
+	return e.meta
+}
+
+func (e ListConstructor) MetaSet(meta interface{}) interface{} {
+	e.meta = meta
+
+	return e
+}
+
+func (node ListConstructor) Print(tab int) {
+	printTab(tab)
+	fmt.Println("[")
+
+	node.Head.Print(tab + 1)
+	fmt.Println()
+	node.Tail.Print(tab + 1)
+	fmt.Println()
+
+	printTab(tab)
+	fmt.Println("]")
+}
+
+// --------------------------------------------------------
+
 type Number struct {
 	Value int
 

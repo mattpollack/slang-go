@@ -1,14 +1,43 @@
 package main
 
 import (
-	"./ast"
-	"./compile"
-	"./vm"
-
 	"fmt"
+	"io/ioutil"
 	"time"
+
+	"./ast"
+	//"./compile"
+	//"./vm"
 )
 
+var DEBUG = false
+
+func main() {
+	// Timer
+	startTime := time.Now()
+	defer func() {
+		fmt.Println("\nExecution time:", time.Now().Sub(startTime))
+	}()
+
+	// Read in bootstrap
+	src, err := ioutil.ReadFile("bootstrap/main.sl")
+
+	AST, err := ast.Parse(src)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	AST = ast.Interpret(AST)
+
+	if DEBUG {
+		fmt.Println("\n---------------------------------------\nAST:\n")
+		AST.Print(0)
+	}
+}
+
+/*
 func main() {
 	// Timer
 	startTime := time.Now()
@@ -81,3 +110,4 @@ let _ = (do
 		}
 	}
 }
+*/

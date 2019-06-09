@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode"
 )
 
@@ -15,6 +16,8 @@ const (
 	TOKEN_KIND_BRACE_CLOSE
 	TOKEN_KIND_PAREN_OPEN
 	TOKEN_KIND_PAREN_CLOSE
+	TOKEN_KIND_BRACKET_OPEN
+	TOKEN_KIND_BRACKET_CLOSE
 	TOKEN_KIND_FAT_ARROW
 	TOKEN_KIND_EQUAL
 	TOKEN_KIND_ARROW
@@ -153,7 +156,7 @@ func (p *parser) Next() token {
 	}
 
 	// Parse reserved
-	for i, s := range []string{"{", "}", "(", ")", "=>", "=", "->", "let", "if", "else", ":"} {
+	for i, s := range []string{"{", "}", "(", ")", "[", "]", "=>", "=", "->", "let", "if", "else", ":"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_BRACE_OPEN + i,
@@ -316,7 +319,16 @@ func (p *parser) Label() (Expression, error) {
 
 func (p *parser) String() (Expression, error) {
 	if p.Peek().kind == TOKEN_KIND_STRING {
-		return NewString(string(p.Next().value))
+		str := string(p.Next().value)
+
+		for i := 0; i < len(str); i++ {
+			switch {
+			case strings.HasPrefix(str[i:], "\\n"):
+				str = str[:i] + "\n" + str[i+2:]
+			}
+		}
+
+		return NewString(str)
 	}
 
 	return nil, errors.New("Cannot parse string")
@@ -415,6 +427,89 @@ func (p *parser) Let() (Expression, error) {
 	}
 }
 
+func (p *parser) List(first Expression) (Expression, error) {
+	m := NewMark(p)
+	list := List{}
+
+	// Because lists and list constructors share their starts
+	if first == nil {
+		if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_OPEN) {
+			return nil, m.Error("Lists must be enclosed by brackets '[', ']'")
+		}
+	} else {
+		list.Values = append(list.Values, first)
+	}
+
+	for !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+		val, err := p.Expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+		list.Values = append(list.Values, val)
+	}
+
+	return list, nil
+}
+
+func (p *parser) ListConstructor(head Expression) (Match, error) {
+	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
+		return nil, errors.New("List constructors must have a colon ':' separating the head and tail expressions")
+	}
+
+	tail, err := p.Expression()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+		return nil, errors.New("List constructors must be enclosed by brackets '[' ']'")
+	}
+
+	return ListConstructor{Head: head, Tail: tail}, nil
+}
+
+func (p *parser) Slice() (Expression, error) {
+	m := NewMark(p)
+	slice := Slice{}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_OPEN) {
+		return nil, m.Error("Slice must be enclosed by brackets '[' ']'")
+	}
+
+	if p.Peek().kind != TOKEN_KIND_COLON {
+		low, err := p.Expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+		slice.Low = low
+	}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
+		return nil, m.Error("Slice bounds must be separated by a colon ':'")
+	}
+
+	if p.Peek().kind != TOKEN_KIND_BRACKET_CLOSE {
+		high, err := p.Expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+		slice.High = high
+	}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+		return nil, m.Error("Slice must be enclosed by brackets '[' ']'")
+	}
+
+	return slice, nil
+}
+
 func (p *parser) Where(id Identifier) (Match, error) {
 	m := NewMark(p)
 
@@ -465,6 +560,7 @@ func (p *parser) Pattern() (Expression, error) {
 
 	for !p.ConsumeIfNext(TOKEN_KIND_BRACE_CLOSE) {
 		matches := []Match{}
+		isImplicitBody := false
 
 		if p.ConsumeIfNext(TOKEN_KIND_FAT_ARROW) {
 			if len(matchBodies) == 0 {
@@ -484,21 +580,46 @@ func (p *parser) Pattern() (Expression, error) {
 				}
 
 				matches = append(matches, match)
+
+				if p.Peek().kind == TOKEN_KIND_BRACE_CLOSE {
+					isImplicitBody = true
+					break
+				}
 			}
 		}
 
-		body, err := p.Expression()
+		// Add missing values for implicit body
+		if isImplicitBody {
+			if len(matchBodies) != 0 {
+				return nil, errors.New("Pattern can only have one implicit true match")
+			}
 
-		if err != nil {
-			return nil, err
+			falseMatches := []Match{}
+
+			for range matches {
+				id, _ := NewIdentifier("_")
+				falseMatches = append(falseMatches, id)
+			}
+
+			bodies = append(bodies, True)
+			bodies = append(bodies, False)
+			matchBodies = append(matchBodies, matches)
+			matchBodies = append(matchBodies, falseMatches)
+
+		} else {
+			body, err := p.Expression()
+
+			if err != nil {
+				return nil, err
+			}
+
+			if len(matchBodies) > 0 && len(matches) != len(matchBodies[0]) {
+				return nil, errors.New("Pattern cannot take varying arguments")
+			}
+
+			matchBodies = append(matchBodies, matches)
+			bodies = append(bodies, body)
 		}
-
-		if len(matchBodies) > 0 && len(matches) != len(matchBodies[0]) {
-			return nil, errors.New("Pattern cannot take varying arguments")
-		}
-
-		matchBodies = append(matchBodies, matches)
-		bodies = append(bodies, body)
 	}
 
 	return NewPattern(matchBodies, bodies)
@@ -527,6 +648,7 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(Identifier), nil
+
 	case TOKEN_KIND_LABEL:
 		m, err := p.Label()
 
@@ -535,6 +657,7 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(Label), nil
+
 	case TOKEN_KIND_STRING:
 		m, err := p.String()
 
@@ -543,6 +666,7 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(String), nil
+
 	case TOKEN_KIND_NUMBER:
 		m, err := p.Number()
 
@@ -551,6 +675,33 @@ func (p *parser) Match() (Match, error) {
 		}
 
 		return m.(Number), nil
+
+		// Lists and list constructors: open bracket and an expression
+	case TOKEN_KIND_BRACKET_OPEN:
+		p.Next()
+
+		if p.Peek().kind == TOKEN_KIND_COLON {
+			return nil, errors.New("List constructor cannot have an empty head value")
+		}
+
+		expr, err := p.Expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+		if p.Peek().kind == TOKEN_KIND_COLON {
+			return p.ListConstructor(expr)
+		} else {
+			m, err := p.List(expr)
+
+			if err != nil {
+				return nil, err
+			}
+
+			return m.(List), nil
+		}
+
 	default:
 		return nil, m.Error("Unexpected error occured when parsing match")
 	}
@@ -585,6 +736,11 @@ func (p *parser) Expression() (Expression, error) {
 
 	if p.Peek().kind == TOKEN_KIND_PAREN_OPEN {
 		return p.Application()
+	}
+
+	// Lists and list constructors: open bracket and an expression
+	if p.Peek().kind == TOKEN_KIND_BRACKET_OPEN {
+		return p.List(nil)
 	}
 
 	if p.Peek().kind == TOKEN_KIND_IF {
