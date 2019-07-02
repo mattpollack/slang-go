@@ -1,8 +1,9 @@
-let test = {
-  [(+ 0 1):[]] -> (print "ok cool\n")
-  [x:xs] -> (print "ok dope\n")
+option = {
+  .none -> { .none -> .true }
+  .some -> { n .some -> n }
 }
 
-let _ = (test [1 2])
-let _ = (test [1])
-(print "ok")
+match (option.some 10) {
+  v : (v.none) -> (print "none")
+  v : (v.some) -> (print (v.some))
+}

@@ -134,7 +134,7 @@ func (p *parser) Next() token {
 	}
 
 	// Parse reserved identifiers 1
-	for _, s := range []string{"=="} {
+	for _, s := range []string{"==", "!=", "++"} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
 				TOKEN_KIND_IDENTIFIER,
@@ -400,18 +400,19 @@ func (p *parser) MatchExpr() (Expression, error) {
 	return NewApplication([]Expression{with, toMatch})
 }
 
-func (p *parser) Let() (Expression, error) {
+func (p *parser) Let(identifier Identifier) (Expression, error) {
 	m := NewMark(p)
 
-	if !p.ConsumeIfNext(TOKEN_KIND_LET) {
-		return nil, m.Error("Let must begin with 'let'")
-	}
+	//
+	// if !p.ConsumeIfNext(TOKEN_KIND_LET) {
+	// 	return nil, m.Error("Let must begin with 'let'")
+	// }
 
-	identifier, err := p.Identifier()
+	// identifier, err := p.Identifier()
 
-	if err != nil {
-		return nil, m.Error(err.Error())
-	}
+	// if err != nil {
+	// return nil, m.Error(err.Error())
+	// }
 
 	if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
 		return nil, m.Error("'=' must follow identifier in let")
@@ -433,13 +434,13 @@ func (p *parser) Let() (Expression, error) {
 	switch b := body.(type) {
 	case Let:
 		return NewLet(
-			append([]Identifier{identifier.(Identifier)}, b.BoundIds...),
+			append([]Identifier{identifier}, b.BoundIds...),
 			append([]Expression{value}, b.BoundValues...),
 			b.Body,
 		)
 	default:
 		return NewLet(
-			[]Identifier{identifier.(Identifier)},
+			[]Identifier{identifier},
 			[]Expression{value},
 			body,
 		)
@@ -734,8 +735,15 @@ func (p *parser) Match() (Match, error) {
 func (p *parser) Expression() (Expression, error) {
 	m := NewMark(p)
 
+	// Identifier or let
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
-		return p.Identifier()
+		id, _ := NewIdentifier(string(p.Next().value))
+
+		if p.Peek().kind == TOKEN_KIND_EQUAL {
+			return p.Let(id)
+		} else {
+			return id, nil
+		}
 	}
 
 	if p.Peek().kind == TOKEN_KIND_LABEL {
@@ -748,10 +756,6 @@ func (p *parser) Expression() (Expression, error) {
 
 	if p.Peek().kind == TOKEN_KIND_NUMBER {
 		return p.Number()
-	}
-
-	if p.Peek().kind == TOKEN_KIND_LET {
-		return p.Let()
 	}
 
 	if p.Peek().kind == TOKEN_KIND_MATCH {

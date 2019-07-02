@@ -170,6 +170,30 @@ var builtin = map[string]func(Expression, bool) Expression{
 			}
 		})
 	},
+	"!=": func(a0 Expression, safe bool) Expression {
+		return NewNative(func(a1 Expression, safe bool) Expression {
+			if a0.Equals(a1) {
+				return False
+			} else {
+				return True
+			}
+		})
+	},
+	"++": func(arg Expression, safe bool) Expression {
+		switch A0 := arg.(type) {
+		case List:
+			return NewNative(func(arg Expression, safe bool) Expression {
+				switch A1 := arg.(type) {
+				case List:
+					return List{Values: append(append([]Expression{}, A0.Values...), A1.Values...)}
+				}
+
+				return Panic(safe, "Non-slice passed to '++'")
+			})
+		}
+
+		return Panic(safe, "Non-slice passed to '++'")
+	},
 	"print": func(arg Expression, safe bool) Expression {
 		switch A := arg.(type) {
 		case Number:
@@ -183,7 +207,7 @@ var builtin = map[string]func(Expression, bool) Expression{
 		case Pattern:
 			l, _ := NewLabel("print")
 
-			if p := A.Apply(l, safe); p != nil {
+			if p := A.Apply(l, true); p != nil {
 				return p
 			}
 
@@ -345,14 +369,11 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 	for i, match := range e.Matches {
 		switch M := match[0].(type) {
 		case Identifier:
-			if v := res.env.Get(M.Value); v == nil {
-				res.env = res.env.Set(M.Value, arg)
-				res.Bodies = append(res.Bodies, e.Bodies[i])
-				res.Matches = append(res.Matches, e.Matches[i][1:])
-			} else if v.Equals(arg) {
-				res.Bodies = append(res.Bodies, e.Bodies[i])
-				res.Matches = append(res.Matches, e.Matches[i][1:])
-			}
+			// NOTE: identifiers are always reassigned (since letrec support isn't in yet)
+			// Apply an identifier like (a) to match it's value
+			res.env = res.env.Set(M.Value, arg)
+			res.Bodies = append(res.Bodies, e.Bodies[i])
+			res.Matches = append(res.Matches, e.Matches[i][1:])
 
 		case Number:
 			if M.Equals(arg) {
@@ -367,7 +388,7 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 			}
 
 		case Where:
-			if M.Condition.Eval(res.env.Set(M.Id.Value, arg), true).Equals(True) {
+			if !M.Condition.Eval(res.env.Set(M.Id.Value, arg), true).Equals(False) {
 				res.env = res.env.Set(M.Id.Value, arg)
 				res.Bodies = append(res.Bodies, e.Bodies[i])
 				res.Matches = append(res.Matches, e.Matches[i][1:])
@@ -529,13 +550,15 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 	}
 
 	if len(res.Matches) == 0 {
-		fmt.Println("Argument:")
-		arg.Print(1)
-		fmt.Println()
-		fmt.Println("Pattern:")
-		e.Print(1)
-		fmt.Println()
-		fmt.Println()
+		if !safe {
+			fmt.Println("Argument:")
+			arg.Print(1)
+			fmt.Println()
+			fmt.Println("Pattern:")
+			e.Print(1)
+			fmt.Println()
+			fmt.Println()
+		}
 
 		return Panic(safe, "Failed to match argument to pattern")
 	}

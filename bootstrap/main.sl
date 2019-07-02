@@ -6,6 +6,17 @@ let for = {
   s           fn -> (for (fn s) fn)
 }
 
+let map = {
+  fn -> {
+    []     -> []
+    [x:xs] ->
+      match (fn x) {
+        val -> (++ [val] (map fn xs))
+            => (map fn xs)    
+      }
+  }
+}
+
 let responds_to = {
   val label : (match (val label) { .false -> .false => .true })
 }
@@ -65,7 +76,7 @@ let printf = {
 # Cheap way to force a panic
 let panic = {
   str ->
-    let _ = (print str)
+    let _ = (printf "Panic: '%s'\n" str)
     ({ 0 -> 1} 1)
 }
 
@@ -87,47 +98,39 @@ let parser =
     (token_new .TOKEN_KIND_BRACKET_CLOSE "}")
     (token_new .TOKEN_KIND_ARROW         "->")
     (token_new .TOKEN_KIND_PLUS          "+")
-    (token_new .TOKEN_KIND_PLUS          "-")
+    (token_new .TOKEN_KIND_MINUS         "-")
   ]
 
-  # Attempt to parse the next token
-  let next_reserved = {
-    src -> (for
-      {
-        .end    -> .false
-        .tokens -> tokens
-      }
-      {
-        s -> match (s.tokens) {
-          []     -> { .end -> .true }
-          [t:ts] -> match src {
-            [(t.val):ss] ->
-              { .end   -> .true
-                .match -> t
-                .src   -> ss
-              }
-            =>
-              { .end    -> .false
-                .tokens -> ts
-              }
-          }
-        }
-      })  
+  # Attempts to parse the next token
+  let parse_reserved = {
+    ["(":src] -> (token_new .TOKEN_KIND_PAREN_OPEN "(")
+
+    => .nil
   }
-  
+
+  # The private parser interface used by the main parser interface 
+  let parser_new = {
+    src prev -> {
+      .src  -> src
+      .prev -> prev
+      .next ->
+        match (parse_reserved src) {
+          token : (!= t .nil) -> token
+                              => (token_new .TOKEN_KIND_ERROR "Unable to continue parsing")
+        }
+    }
+  }
+
+  # Main parser interface 
   {
     src ->
-      (print ((next_reserved src).match))
+      let parser = (parser_new src (token_new .TOKEN_KIND_BEGIN "BUFFER BEGIN"))
+      (print (parser.next))
 
     # Always end the buffer
     => (token_new .TOKEN_KIND_BUFFER_END)
   }
 
-let src =
-"{
-  0 -> 1
-  1 -> 1
-  n -> fib (n - 1) + fib (n - 2)
-}"
+let src = "(){}->"
 
 (printf "%s\n" (parser src))
