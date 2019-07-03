@@ -11,33 +11,67 @@ import (
 const (
 	_ = iota
 
-	// Reserved
+	// Reserved sorted by length
+	TOKEN_KIND_MATCH
+	TOKEN_KIND_ELSE
+
+	TOKEN_KIND_IF
+	TOKEN_KIND_FAT_ARROW
+	TOKEN_KIND_ARROW
+	TOKEN_KIND_OP_EQUALS
+	TOKEN_KIND_OP_NOT_EQUALS
+	TOKEN_KIND_OP_GREATER_THAN_EQUAL
+	TOKEN_KIND_OP_LESS_THAN_EQUAL
+	TOKEN_KIND_OP_LOGICAL_AND
+	TOKEN_KIND_OP_LOGICAL_OR
+
 	TOKEN_KIND_BRACE_OPEN
 	TOKEN_KIND_BRACE_CLOSE
 	TOKEN_KIND_PAREN_OPEN
 	TOKEN_KIND_PAREN_CLOSE
 	TOKEN_KIND_BRACKET_OPEN
 	TOKEN_KIND_BRACKET_CLOSE
-	TOKEN_KIND_FAT_ARROW
 	TOKEN_KIND_EQUAL
-	TOKEN_KIND_ARROW
-	TOKEN_KIND_LET
-	TOKEN_KIND_MATCH
-	TOKEN_KIND_IF
-	TOKEN_KIND_ELSE
 	TOKEN_KIND_COLON
+	TOKEN_KIND_COMMA
+	TOKEN_KIND_OP_ADD
+	TOKEN_KIND_OP_SUBTRACT
+	TOKEN_KIND_OP_MULTIPLY
+	TOKEN_KIND_OP_DIVIDE
+	TOKEN_KIND_OP_GREATER_THAN
+	TOKEN_KIND_OP_LESS_THAN
 
 	TOKEN_KIND_IDENTIFIER
 	TOKEN_KIND_LABEL
 	TOKEN_KIND_STRING
 	TOKEN_KIND_NUMBER
 
-	TOKEN_KIND_EOL
-	TOKEN_KIND_SEMI_COLON
-
 	TOKEN_KIND_ERROR
 	TOKEN_KIND_EOF
 )
+
+var opPrecedence [][]int = [][]int{
+	[]int{
+		TOKEN_KIND_OP_ADD,
+		TOKEN_KIND_OP_SUBTRACT,
+	},
+	[]int{
+		TOKEN_KIND_OP_MULTIPLY,
+		TOKEN_KIND_OP_DIVIDE,
+	},
+	[]int{
+		TOKEN_KIND_OP_LOGICAL_AND,
+		TOKEN_KIND_OP_LOGICAL_OR,
+	},
+	[]int{
+		TOKEN_KIND_OP_GREATER_THAN,
+		TOKEN_KIND_OP_GREATER_THAN_EQUAL,
+		TOKEN_KIND_OP_LESS_THAN,
+		TOKEN_KIND_OP_LESS_THAN_EQUAL,
+		TOKEN_KIND_OP_EQUALS,
+		TOKEN_KIND_OP_NOT_EQUALS,
+	},
+}
 
 type token struct {
 	kind  int
@@ -45,6 +79,9 @@ type token struct {
 
 	line int
 	char int
+
+	firstOfLine  bool // this token is first on its line
+	skippedSpace bool // this token did not skip spaces before getting parsed
 }
 
 type parser struct {
@@ -108,6 +145,9 @@ func (p *parser) SkipWS() {
 }
 
 func (p *parser) Next() token {
+	oldLen := len(p.src)
+	oldLine := p.line
+
 	// Handle spaces and comments
 	for {
 		p.SkipWS()
@@ -124,57 +164,54 @@ func (p *parser) Next() token {
 		}
 	}
 
+	firstOfLine := oldLine != p.line
+	skippedSpace := oldLen != len(p.src)
+
 	if len(p.src) == 0 {
 		return token{
 			TOKEN_KIND_EOF,
-			nil,
+			[]byte("EOF"),
 			p.line,
 			p.char,
-		}
-	}
-
-	// Parse reserved identifiers 1
-	for _, s := range []string{"==", "!=", "++"} {
-		if bytes.HasPrefix(p.src, []byte(s)) {
-			token := token{
-				TOKEN_KIND_IDENTIFIER,
-				[]byte(s),
-				p.line,
-				p.char,
-			}
-
-			p.char += len(s)
-			p.src = p.src[len(s):]
-
-			return token
+			firstOfLine,
+			skippedSpace,
 		}
 	}
 
 	// Parse reserved
-	for i, s := range []string{"{", "}", "(", ")", "[", "]", "=>", "=", "->", "let", "match", "if", "else", ":"} {
+	for i, s := range []string{
+		"match",
+		"else",
+		"if",
+		"=>",
+		"->",
+		"==",
+		"!=",
+		">=",
+		"<=",
+		"&&",
+		"||",
+		"{", "}",
+		"(", ")",
+		"[", "]",
+		"=",
+		":",
+		",",
+		"+",
+		"-",
+		"*",
+		"/",
+		">",
+		"<",
+	} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
-				TOKEN_KIND_BRACE_OPEN + i,
+				TOKEN_KIND_MATCH + i,
 				[]byte(s),
 				p.line,
 				p.char,
-			}
-
-			p.char += len(s)
-			p.src = p.src[len(s):]
-
-			return token
-		}
-	}
-
-	// Parse reserved identifiers 2
-	for _, s := range []string{"-", "+", "*", "/", ">=", "<=", ">", "<", "||", "&&"} {
-		if bytes.HasPrefix(p.src, []byte(s)) {
-			token := token{
-				TOKEN_KIND_IDENTIFIER,
-				[]byte(s),
-				p.line,
-				p.char,
+				firstOfLine,
+				skippedSpace,
 			}
 
 			p.char += len(s)
@@ -196,6 +233,8 @@ func (p *parser) Next() token {
 			p.src[:i],
 			p.line,
 			p.char,
+			firstOfLine,
+			skippedSpace,
 		}
 
 		p.char += i
@@ -216,6 +255,8 @@ func (p *parser) Next() token {
 			p.src[1:i],
 			p.line,
 			p.char,
+			firstOfLine,
+			skippedSpace,
 		}
 
 		p.char += i
@@ -237,6 +278,8 @@ func (p *parser) Next() token {
 			p.src[1 : i-1],
 			p.line,
 			p.char,
+			firstOfLine,
+			skippedSpace,
 		}
 
 		p.char += i
@@ -257,6 +300,8 @@ func (p *parser) Next() token {
 			p.src[:i],
 			p.line,
 			p.char,
+			firstOfLine,
+			skippedSpace,
 		}
 
 		p.char += i
@@ -270,6 +315,8 @@ func (p *parser) Next() token {
 		[]byte("Unexpected end of parsing"),
 		p.line,
 		p.char,
+		firstOfLine,
+		skippedSpace,
 	}
 }
 
@@ -346,6 +393,7 @@ func (p *parser) Number() (Expression, error) {
 	return NewNumber(value)
 }
 
+/*
 func (p *parser) If() (Expression, error) {
 	m := NewMark(p)
 
@@ -377,6 +425,7 @@ func (p *parser) If() (Expression, error) {
 
 	return NewIf(condition, tbody, fbody)
 }
+*/
 
 func (p *parser) MatchExpr() (Expression, error) {
 	m := NewMark(p)
@@ -385,7 +434,7 @@ func (p *parser) MatchExpr() (Expression, error) {
 		return nil, m.Error("Match must begin with 'match'")
 	}
 
-	toMatch, err := p.Expression()
+	toMatch, err := p.Expression([]int{TOKEN_KIND_BRACE_OPEN})
 
 	if err != nil {
 		return nil, err
@@ -403,28 +452,17 @@ func (p *parser) MatchExpr() (Expression, error) {
 func (p *parser) Let(identifier Identifier) (Expression, error) {
 	m := NewMark(p)
 
-	//
-	// if !p.ConsumeIfNext(TOKEN_KIND_LET) {
-	// 	return nil, m.Error("Let must begin with 'let'")
-	// }
-
-	// identifier, err := p.Identifier()
-
-	// if err != nil {
-	// return nil, m.Error(err.Error())
-	// }
-
 	if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
 		return nil, m.Error("'=' must follow identifier in let")
 	}
 
-	value, err := p.Expression()
+	value, err := p.Expression([]int{})
 
 	if err != nil {
 		return nil, m.Error("Let must be assigned a value")
 	}
 
-	body, err := p.Expression()
+	body, err := p.Expression([]int{})
 
 	if err != nil {
 		return nil, m.Error("Let must have a body")
@@ -455,14 +493,26 @@ func (p *parser) List(first Expression) (Expression, error) {
 		list.Values = append(list.Values, first)
 	}
 
-	for !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
-		val, err := p.Expression()
+	// Check for an empty list
+	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+		for {
+			val, err := p.Expression([]int{TOKEN_KIND_COMMA, TOKEN_KIND_BRACKET_CLOSE})
 
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
+
+			if p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+				break
+			}
+
+			// NOTE: !p.Peek().firstOfLine &&
+			if !p.ConsumeIfNext(TOKEN_KIND_COMMA) {
+				return nil, errors.New("Values in a list must be separated by commas or new lines")
+			}
+
+			list.Values = append(list.Values, val)
 		}
-
-		list.Values = append(list.Values, val)
 	}
 
 	return list, nil
@@ -473,7 +523,7 @@ func (p *parser) ListConstructor(head Expression) (Match, error) {
 		return nil, errors.New("List constructors must have a colon ':' separating the head and tail expressions")
 	}
 
-	tail, err := p.Expression()
+	tail, err := p.Expression([]int{TOKEN_KIND_BRACKET_CLOSE})
 
 	if err != nil {
 		return nil, err
@@ -495,7 +545,7 @@ func (p *parser) Slice() (Expression, error) {
 	}
 
 	if p.Peek().kind != TOKEN_KIND_COLON {
-		low, err := p.Expression()
+		low, err := p.Expression([]int{TOKEN_KIND_COLON})
 
 		if err != nil {
 			return nil, err
@@ -509,7 +559,7 @@ func (p *parser) Slice() (Expression, error) {
 	}
 
 	if p.Peek().kind != TOKEN_KIND_BRACKET_CLOSE {
-		high, err := p.Expression()
+		high, err := p.Expression([]int{TOKEN_KIND_BRACKET_CLOSE})
 
 		if err != nil {
 			return nil, err
@@ -532,35 +582,21 @@ func (p *parser) Where(id Identifier) (Match, error) {
 		return nil, m.Error("Colon must separate where identifier from body")
 	}
 
-	body, err := p.Expression()
+	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
+		return nil, m.Error("Where body must be enclosed by parenthesis '(' ')'")
+	}
+
+	body, err := p.Expression([]int{TOKEN_KIND_PAREN_CLOSE})
 
 	if err != nil {
-		return nil, m.Error("Where must have a body")
+		return nil, err
+	}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
+		return nil, m.Error("Where body must be enclosed by parenthesis '(' ')'")
 	}
 
 	return NewWhere(id, body)
-}
-
-func (p *parser) Application() (Expression, error) {
-	m := NewMark(p)
-
-	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
-		return nil, m.Error("Application must be enclosed by parenthesis '(' ')'")
-	}
-
-	body := []Expression{}
-
-	for !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
-		expr, err := p.Expression()
-
-		if err != nil {
-			return nil, m.Error("Application may only contain expressions")
-		}
-
-		body = append(body, expr)
-	}
-
-	return NewApplication(body)
 }
 
 func (p *parser) Pattern() (Expression, error) {
@@ -622,7 +658,8 @@ func (p *parser) Pattern() (Expression, error) {
 			matchBodies = append(matchBodies, falseMatches)
 
 		} else {
-			body, err := p.Expression()
+			// TODO: revisit cases
+			body, err := p.Expression([]int{})
 
 			if err != nil {
 				return nil, err
@@ -691,7 +728,7 @@ func (p *parser) Match() (Match, error) {
 
 		return m.(Number), nil
 
-		// Lists and list constructors: open bracket and an expression
+	// Lists and list constructors: open bracket and an expression
 	case TOKEN_KIND_BRACKET_OPEN:
 		p.Next()
 
@@ -709,7 +746,7 @@ func (p *parser) Match() (Match, error) {
 			return nil, errors.New("List constructor cannot have an empty head value")
 		}
 
-		expr, err := p.Expression()
+		expr, err := p.Expression([]int{TOKEN_KIND_COLON, TOKEN_KIND_COMMA, TOKEN_KIND_BRACKET_CLOSE})
 
 		if err != nil {
 			return nil, err
@@ -732,10 +769,7 @@ func (p *parser) Match() (Match, error) {
 	}
 }
 
-func (p *parser) Expression() (Expression, error) {
-	m := NewMark(p)
-
-	// Identifier or let
+func (p *parser) PrimaryExpr(endTokenKinds []int) (Expression, error) {
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		id, _ := NewIdentifier(string(p.Next().value))
 
@@ -767,7 +801,18 @@ func (p *parser) Expression() (Expression, error) {
 	}
 
 	if p.Peek().kind == TOKEN_KIND_PAREN_OPEN {
-		return p.Application()
+		p.Next()
+		res, err := p.Expression([]int{TOKEN_KIND_PAREN_CLOSE})
+
+		if err != nil {
+			return nil, err
+		}
+
+		if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
+			return nil, errors.New("Application which starts with an open parenthesis must close with one")
+		}
+
+		return res, nil
 	}
 
 	// Lists and list constructors: open bracket and an expression
@@ -776,14 +821,105 @@ func (p *parser) Expression() (Expression, error) {
 		return p.List(nil)
 	}
 
-	// Disabled for now
-	//if p.Peek().kind == TOKEN_KIND_IF {
-	//	return p.If()
-	//}
-
-	return nil, m.Error("Unexpected error occured when parsing an expression")
+	return nil, errors.New("Unexpected error occured when parsing an expression")
 }
 
+func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error) {
+	if precedence >= len(opPrecedence) {
+		exprs := []Expression{}
+
+		for {
+			next, err := p.PrimaryExpr(endTokenKinds)
+
+			if err != nil {
+				return nil, err
+			}
+
+			exprs = append(exprs, next)
+
+			// Parse for end of op
+			end := false
+
+			for _, token := range endTokenKinds {
+				if p.Peek().kind == token {
+					end = true
+					break
+				}
+			}
+
+			if end {
+				break
+			}
+
+			if p.Peek().firstOfLine {
+				break
+			}
+		}
+
+		if len(exprs) == 0 {
+			return nil, errors.New("Cannot parse primary expression")
+		}
+
+		if len(exprs) == 1 {
+			return exprs[0], nil
+		}
+
+		return Application{Body: exprs}, nil
+	} else {
+		var head Expression
+		var err error
+		head, err = p.OpExpr(precedence+1, append(append([]int{}, opPrecedence[precedence]...), endTokenKinds...))
+
+		if err != nil {
+			return nil, err
+		}
+
+		for !p.Peek().firstOfLine {
+			// Parse for end of op
+			end := false
+
+			for _, token := range endTokenKinds {
+				if p.Peek().kind == token {
+					end = true
+					break
+				}
+			}
+
+			if end {
+				break
+			}
+
+			// Parse op
+			foundOp := false
+
+			for _, token := range opPrecedence[precedence] {
+				if p.Peek().kind == token {
+					foundOp = true
+					t := p.Next()
+
+					next, err := p.OpExpr(precedence+1, append(append([]int{}, opPrecedence[precedence]...), endTokenKinds...))
+
+					if err != nil {
+						return nil, err
+					}
+
+					head = Application{Body: []Expression{Identifier{Value: string(t.value)}, head, next}}
+					break
+				}
+			}
+
+			if !foundOp {
+				return nil, errors.New("Unexpected token found when attempting to parse operator")
+			}
+		}
+
+		return head, nil
+	}
+}
+
+func (p *parser) Expression(endTokenKinds []int) (Expression, error) {
+	return p.OpExpr(0, append(endTokenKinds, TOKEN_KIND_EOF))
+}
 func Parse(src []byte) (Expression, error) {
 	p := parser{
 		src,
@@ -791,14 +927,14 @@ func Parse(src []byte) (Expression, error) {
 		1,
 	}
 
-	ast, err := p.Expression()
+	ast, err := p.Expression([]int{})
 
 	if err != nil {
 		return nil, err
 	}
 
 	if p.Next().kind != TOKEN_KIND_EOF {
-		return nil, fmt.Errorf("[%d:%d] Unexpected error occured", p.line, p.char)
+		return nil, fmt.Errorf("[%d:%d] Unexpected end of parsing", p.line, p.char)
 	}
 
 	return ast, nil

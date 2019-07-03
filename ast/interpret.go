@@ -205,11 +205,8 @@ var builtin = map[string]func(Expression, bool) Expression{
 
 		// Only print patterns if they respond to ".print"
 		case Pattern:
-			l, _ := NewLabel("print")
-
-			if p := A.Apply(l, true); p != nil {
-				return p
-			}
+			arg.Print(0)
+			fmt.Println()
 
 		default:
 			panic("TODO print value of this type")
@@ -590,6 +587,9 @@ func (e Label) Eval(Environment, bool) Expression {
 }
 
 func (e Label) Apply(arg Expression, safe bool) Expression {
+	arg.Print(0)
+	e.Print(0)
+
 	panic("a label")
 	return nil
 }
