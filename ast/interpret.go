@@ -209,7 +209,7 @@ var builtin = map[string]func(Expression, bool) Expression{
 			fmt.Println()
 
 		default:
-			panic("TODO print value of this type")
+			arg.Print(0)
 		}
 
 		return arg
@@ -307,9 +307,14 @@ func (e Application) Apply(arg Expression, safe bool) Expression {
 }
 
 func (e List) Eval(env Environment, safe bool) Expression {
+	// Make a new slice
+	values := []Expression{}
+
 	for i, _ := range e.Values {
-		e.Values[i] = e.Values[i].Eval(env, safe)
+		values = append(values, e.Values[i].Eval(env, safe))
 	}
+
+	e.Values = values
 
 	return e
 }
@@ -587,10 +592,13 @@ func (e Label) Eval(Environment, bool) Expression {
 }
 
 func (e Label) Apply(arg Expression, safe bool) Expression {
+	fmt.Printf("Failed to apply argument ")
 	arg.Print(0)
+	fmt.Printf(" to ")
 	e.Print(0)
+	fmt.Println()
 
-	panic("a label")
+	panic("Failed to apply argument")
 	return nil
 }
 

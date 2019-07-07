@@ -24,6 +24,7 @@ const (
 	TOKEN_KIND_OP_LESS_THAN_EQUAL
 	TOKEN_KIND_OP_LOGICAL_AND
 	TOKEN_KIND_OP_LOGICAL_OR
+	TOKEN_KIND_OP_APPEND
 
 	TOKEN_KIND_BRACE_OPEN
 	TOKEN_KIND_BRACE_CLOSE
@@ -40,6 +41,8 @@ const (
 	TOKEN_KIND_OP_DIVIDE
 	TOKEN_KIND_OP_GREATER_THAN
 	TOKEN_KIND_OP_LESS_THAN
+
+	TOKEN_KIND_SEMI_COLON
 
 	TOKEN_KIND_IDENTIFIER
 	TOKEN_KIND_LABEL
@@ -58,6 +61,9 @@ var opPrecedence [][]int = [][]int{
 	[]int{
 		TOKEN_KIND_OP_MULTIPLY,
 		TOKEN_KIND_OP_DIVIDE,
+	},
+	[]int{
+		TOKEN_KIND_OP_APPEND,
 	},
 	[]int{
 		TOKEN_KIND_OP_LOGICAL_AND,
@@ -191,6 +197,7 @@ func (p *parser) Next() token {
 		"<=",
 		"&&",
 		"||",
+		"++",
 		"{", "}",
 		"(", ")",
 		"[", "]",
@@ -203,6 +210,7 @@ func (p *parser) Next() token {
 		"/",
 		">",
 		"<",
+		";",
 	} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
@@ -502,6 +510,8 @@ func (p *parser) List(first Expression) (Expression, error) {
 				return nil, err
 			}
 
+			list.Values = append(list.Values, val)
+
 			if p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
 				break
 			}
@@ -510,8 +520,6 @@ func (p *parser) List(first Expression) (Expression, error) {
 			if !p.ConsumeIfNext(TOKEN_KIND_COMMA) {
 				return nil, errors.New("Values in a list must be separated by commas or new lines")
 			}
-
-			list.Values = append(list.Values, val)
 		}
 	}
 
@@ -659,7 +667,7 @@ func (p *parser) Pattern() (Expression, error) {
 
 		} else {
 			// TODO: revisit cases
-			body, err := p.Expression([]int{})
+			body, err := p.Expression([]int{TOKEN_KIND_BRACE_CLOSE})
 
 			if err != nil {
 				return nil, err
@@ -918,8 +926,20 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error)
 }
 
 func (p *parser) Expression(endTokenKinds []int) (Expression, error) {
-	return p.OpExpr(0, append(endTokenKinds, TOKEN_KIND_EOF))
+	// Start parsing with default ender tokens
+	expr, err := p.OpExpr(0, append(endTokenKinds, []int{TOKEN_KIND_EOF, TOKEN_KIND_SEMI_COLON}...))
+
+	if err != nil {
+		return nil, err
+	}
+
+	if p.Peek().kind == TOKEN_KIND_SEMI_COLON {
+		p.Next()
+	}
+
+	return expr, nil
 }
+
 func Parse(src []byte) (Expression, error) {
 	p := parser{
 		src,
