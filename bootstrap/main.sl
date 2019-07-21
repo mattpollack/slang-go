@@ -1,6 +1,7 @@
 # STANDARD LIBRARY
 
-_ = include "std.sl"
+false = .false
+true = .true
 
 printf = {
   format -> match format {
