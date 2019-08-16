@@ -21,9 +21,26 @@ printf = {
   }
 }
 
-for = {
-  s : (s.end) fn -> s
-  s           fn -> for (fn s) fn
+# string helpers
+strings = {
+  .split -> {
+    "" _ ->
+      {
+        .head -> ""
+        .tail -> ""
+      }
+    src 0 ->
+      {
+        .head -> ""
+        .tail -> src
+      }
+    [x:xs] i ->
+      rest = strings.split xs (i - 1)
+      {
+        .head -> x ++ rest.head
+        .tail -> rest.tail
+      }
+  }
 }
 
 map = {
@@ -31,26 +48,56 @@ map = {
   [x:xs] fn -> [fn x] ++ map xs fn
 }
 
+find = {
+  []     _  -> .nil
+  [x:xs] fn -> match fn x {
+    .true -> x
+          => find xs fn
+  }
+}
+
 # MAIN
 
-parser =
-  token_new = {
-    kind value -> { .kind -> kind; .value -> value }
+parser_new =
+  is_alpha = {
+    x : ((x >= "a" && x <= "z") || (x >= "A" && x <= "Z"))
   }
 
-  tokens = [
-    token_new .TOKEN_KIND_BRACE_OPEN  "{",
-    token_new .TOKEN_KIND_BRACE_CLOSE "}"
+  scanner = {
+    fn [x:xs] ->
+      match fn x {
+        .true -> 1 + scanner fn xs
+              => 0
+      }
+  }
+
+  scanner_literal = {
+    [l:ls] [x:xs] -> match l == x {
+      .true -> 1 + scanner_literal ls xs
+            => 0
+    }
+
+    => 0
+  }
+
+  scanners = [
+    { .scan -> scanner { x -> is_alpha x }; .kind -> .TOKEN_KIND_IDENTIFIER  },
+    { .scan -> scanner_literal "{";         .kind -> .TOKEN_KIND_BRACE_OPEN  },
   ]
 
-  _ = map tokens {
-    x -> printf "{} \n" (x.value)
-  }
-
-  {
-    .parse -> {
-      src ->  src
+  parser_new = {
+    src -> {
+      next -> find scanners {
+        scanner ->
+          _ = printf "{}\n" (scanner.scan src)
+          .false
+      }
     }
   }
 
-parser.parse "{}->1"
+  parser_new
+
+parser = parser_new "{}->1"
+_ = print (parser.next)
+
+print ("\n## main.sl\n")

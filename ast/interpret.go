@@ -179,20 +179,29 @@ var builtin = map[string]func(Expression, bool) Expression{
 			}
 		})
 	},
-	"++": func(arg Expression, safe bool) Expression {
-		switch A0 := arg.(type) {
+	"++": func(a Expression, safe bool) Expression {
+		switch A0 := a.(type) {
 		case List:
-			return NewNative(func(arg Expression, safe bool) Expression {
-				switch A1 := arg.(type) {
+			return NewNative(func(b Expression, safe bool) Expression {
+				switch A1 := b.(type) {
 				case List:
 					return List{Values: append(append([]Expression{}, A0.Values...), A1.Values...)}
 				}
 
 				return Panic(safe, "Non-slice passed to '++'")
 			})
+		case String:
+			return NewNative(func(b Expression, safe bool) Expression {
+				switch A1 := b.(type) {
+				case String:
+					return String{Value: A0.Value + A1.Value}
+				}
+
+				return Panic(safe, "Non-string passed to '++'")
+			})
 		}
 
-		return Panic(safe, "Non-slice passed to '++'")
+		return Panic(safe, "Non-string/slice passed to '++'")
 	},
 	"print": func(arg Expression, safe bool) Expression {
 		switch A := arg.(type) {
