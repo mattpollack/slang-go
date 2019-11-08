@@ -241,6 +241,9 @@ func NewNative(fn func(Expression, bool) Expression) Native {
 
 func (e Native) IsExpression() {}
 func (e Native) IsMatch()      {}
+func (e Native) Copy() Expression {
+	return e
+}
 func (e Native) Equals(b interface{}) bool {
 	return false
 }
@@ -366,6 +369,8 @@ func (e If) Apply(arg Expression, safe bool) Expression {
 func (e Pattern) Eval(env Environment, safe bool) Expression {
 	e.env = env
 
+	// TODO: eval all children (when recursive?)
+
 	return e
 }
 
@@ -380,11 +385,15 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 	for i, match := range e.Matches {
 		switch M := match[0].(type) {
 		case Identifier:
-			// NOTE: identifiers are always reassigned (since letrec support isn't in yet)
-			// Apply an identifier like (a) to match it's value
-			res.env = res.env.Set(M.Value, arg)
-			res.Bodies = append(res.Bodies, e.Bodies[i])
-			res.Matches = append(res.Matches, e.Matches[i][1:])
+			// This doesn't seem to be working
+			if v, ok := res.env.Get(M.Value); ok && v.Equals(arg) {
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			} else {
+				res.env = res.env.Set(M.Value, arg)
+				res.Bodies = append(res.Bodies, e.Bodies[i])
+				res.Matches = append(res.Matches, e.Matches[i][1:])
+			}
 
 		case Number:
 			if M.Equals(arg) {
@@ -442,7 +451,7 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 				// Match first value to head
 				switch Head := M.Head.(type) {
 				case Identifier:
-					if v := res.env.Get(Head.Value); v == nil && len(A.Value) > 0 {
+					if v, ok := res.env.Get(Head.Value); ok && len(A.Value) > 0 {
 						sets = append(sets, func() {
 							res.env = res.env.Set(Head.Value, String{Value: A.Value[:1]})
 						})
@@ -473,7 +482,7 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 				// Match the rest of the values to tail
 				switch Tail := M.Tail.(type) {
 				case Identifier:
-					if v := res.env.Get(Tail.Value); v == nil {
+					if v, ok := res.env.Get(Tail.Value); ok {
 						sets = append(sets, func() {
 							res.env = res.env.Set(Tail.Value, String{Value: A.Value[headOffset:]})
 						})
@@ -582,13 +591,11 @@ func (e Pattern) Apply(arg Expression, safe bool) Expression {
 }
 
 func (e Identifier) Eval(env Environment, safe bool) Expression {
-	res := env.Get(e.Value)
-
-	if res == nil {
+	if res, ok := env.Get(e.Value); !ok {
 		return Panic(safe, fmt.Sprintf("Cannot find identifier '%s'", e.Value))
+	} else {
+		return res
 	}
-
-	return res
 }
 
 func (e Identifier) Apply(arg Expression, safe bool) Expression {

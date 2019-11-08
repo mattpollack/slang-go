@@ -1,18 +1,22 @@
 
-
-
-# Why doesn't this work? Cannot find identifier test
-
-
-test = {
-    x -> {
-      .push -> { y -> test (x ++ [y]) }
-      .vals -> x
+map = {
+  state .get s -> state s
+  state .set s -> {
+    v -> map {
+      s -> v
+      k -> state k
     }
-  } []
+  }
+}
 
-test = test.push 5
-_ = print (test.vals)
-_ = print "\n"
+map = map { _ -> .nil }
 
-print "# sketch\n"
+test = map
+test = test.set.derp 10
+
+# _ = print_ast (test.get.derp)
+_ = test.set.herp
+
+print "\ndone!\n"
+
+

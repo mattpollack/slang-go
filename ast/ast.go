@@ -26,6 +26,7 @@ type Expression interface {
 
 	Eval(Environment, bool) Expression
 	Apply(Expression, bool) Expression
+	Copy() Expression
 
 	IsExpression()
 }
@@ -57,14 +58,30 @@ func (e Environment) Set(id string, val Expression) Environment {
 	return e
 }
 
-func (e Environment) Get(id string) Expression {
-	return e.Bound[id]
+func (e Environment) Get(id string) (Expression, bool) {
+	exp, ok := e.Bound[id]
+
+	if ok {
+		return exp.Copy(), true
+	} else {
+		return nil, false
+	}
 }
 
 func (e Environment) Unset(id string) Environment {
 	delete(e.Bound, id)
 
 	return e
+}
+
+func (e Environment) Copy() Environment {
+	bound := map[string]Expression{}
+
+	for k, v := range e.Bound {
+		bound[k] = v
+	}
+
+	return Environment{bound}
 }
 
 // --------------------------------------------------------
@@ -76,6 +93,15 @@ type Application struct {
 }
 
 func (e Application) IsExpression() {}
+func (e Application) Copy() Expression {
+	body := []Expression{}
+
+	for _, b := range e.Body {
+		body = append(body, b.Copy())
+	}
+
+	return Application{body, e.meta}
+}
 
 func NewApplication(body []Expression) (Application, error) {
 	return Application{
@@ -189,6 +215,21 @@ type Pattern struct {
 
 func (e Pattern) IsExpression() {}
 
+func (e Pattern) Copy() Expression {
+	bodies := []Expression{}
+
+	for _, b := range e.Bodies {
+		bodies = append(bodies, b.Copy())
+	}
+
+	return Pattern{
+		e.Matches,
+		bodies,
+		e.env.Copy(),
+		e.meta,
+	}
+}
+
 func NewPattern(m [][]Match, b []Expression) (Pattern, error) {
 	return Pattern{
 		m,
@@ -260,6 +301,9 @@ type Identifier struct {
 
 func (e Identifier) IsExpression() {}
 func (e Identifier) IsMatch()      {}
+func (e Identifier) Copy() Expression {
+	return e
+}
 
 func NewIdentifier(v string) (Identifier, error) {
 	return Identifier{
@@ -302,6 +346,9 @@ type Label struct {
 
 func (e Label) IsExpression() {}
 func (e Label) IsMatch()      {}
+func (e Label) Copy() Expression {
+	return e
+}
 
 func NewLabel(v string) (Label, error) {
 	return Label{
@@ -344,6 +391,9 @@ type String struct {
 
 func (e String) IsExpression() {}
 func (e String) IsMatch()      {}
+func (e String) Copy() Expression {
+	return e
+}
 
 func NewString(v string) (String, error) {
 	return String{
@@ -386,8 +436,15 @@ type Slice struct {
 }
 
 func (e Slice) IsExpression() {}
+func (e Slice) Copy() Expression {
+	return Slice{
+		e.Low.Copy(),
+		e.High.Copy(),
+		e.meta,
+	}
+}
 
-func (A Slice) Equals(b interface{}) bool {
+func (e Slice) Equals(b interface{}) bool {
 	panic("TODO slice equals")
 }
 
@@ -415,6 +472,15 @@ type List struct {
 
 func (e List) IsExpression() {}
 func (e List) IsMatch()      {}
+func (e List) Copy() Expression {
+	values := []Expression{}
+
+	for _, v := range e.Values {
+		values = append(values, v.Copy())
+	}
+
+	return List{values, e.meta}
+}
 
 func (A List) Equals(b interface{}) bool {
 	switch B := b.(type) {
@@ -506,6 +572,9 @@ type Number struct {
 
 func (e Number) IsExpression() {}
 func (e Number) IsMatch()      {}
+func (e Number) Copy() Expression {
+	return e
+}
 
 func NewNumber(v int) (Number, error) {
 	return Number{
@@ -549,6 +618,20 @@ type Let struct {
 }
 
 func (e Let) IsExpression() {}
+func (e Let) Copy() Expression {
+	bvs := []Expression{}
+
+	for _, bv := range e.BoundValues {
+		bvs = append(bvs, bv.Copy())
+	}
+
+	return Let{
+		e.BoundIds,
+		bvs,
+		e.Body.Copy(),
+		e.meta,
+	}
+}
 
 func NewLet(ids []Identifier, vs []Expression, b Expression) (Let, error) {
 	return Let{
