@@ -351,7 +351,7 @@ func (p *parser) ConsumeIfNext(kind int) bool {
 	return false
 }
 
-func (p *parser) Identifier() (Expression, error) {
+func (p *parser) Identifier() (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		return NewIdentifier(string(p.Next().value))
 	}
@@ -359,7 +359,7 @@ func (p *parser) Identifier() (Expression, error) {
 	return nil, errors.New("Cannot parse identifier")
 }
 
-func (p *parser) Label() (Expression, error) {
+func (p *parser) Label() (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_LABEL {
 		return NewLabel(string(p.Next().value))
 	}
@@ -367,7 +367,7 @@ func (p *parser) Label() (Expression, error) {
 	return nil, errors.New("Cannot parse label")
 }
 
-func (p *parser) String() (Expression, error) {
+func (p *parser) String() (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_STRING {
 		str := string(p.Next().value)
 
@@ -386,7 +386,7 @@ func (p *parser) String() (Expression, error) {
 	return nil, errors.New("Cannot parse string")
 }
 
-func (p *parser) Number() (Expression, error) {
+func (p *parser) Number() (AST, error) {
 	if p.Peek().kind != TOKEN_KIND_NUMBER {
 		return nil, errors.New("Cannot parse number")
 	}
@@ -401,41 +401,7 @@ func (p *parser) Number() (Expression, error) {
 	return NewNumber(value)
 }
 
-/*
-func (p *parser) If() (Expression, error) {
-	m := NewMark(p)
-
-	if !p.ConsumeIfNext(TOKEN_KIND_IF) {
-		return nil, m.Error("If must begin with 'if'")
-	}
-
-	condition, err := p.Expression()
-
-	if err != nil {
-		return nil, m.Error("If must have a condition")
-	}
-
-	tbody, err := p.Expression()
-
-	if err != nil {
-		return nil, m.Error("If must have a body")
-	}
-
-	if !p.ConsumeIfNext(TOKEN_KIND_ELSE) {
-		return nil, m.Error("If must be followed by an else")
-	}
-
-	fbody, err := p.Expression()
-
-	if err != nil {
-		return nil, m.Error("Else must have a body")
-	}
-
-	return NewIf(condition, tbody, fbody)
-}
-*/
-
-func (p *parser) MatchExpr() (Expression, error) {
+func (p *parser) MatchExpr() (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_MATCH) {
@@ -454,10 +420,10 @@ func (p *parser) MatchExpr() (Expression, error) {
 		return nil, err
 	}
 
-	return NewApplication([]Expression{with, toMatch})
+	return NewApplication([]AST{with, toMatch})
 }
 
-func (p *parser) Let(identifier Identifier) (Expression, error) {
+func (p *parser) Let(identifier Identifier) (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
@@ -481,19 +447,19 @@ func (p *parser) Let(identifier Identifier) (Expression, error) {
 	case Let:
 		return NewLet(
 			append([]Identifier{identifier}, b.BoundIds...),
-			append([]Expression{value}, b.BoundValues...),
+			append([]AST{value}, b.BoundValues...),
 			b.Body,
 		)
 	default:
 		return NewLet(
 			[]Identifier{identifier},
-			[]Expression{value},
+			[]AST{value},
 			body,
 		)
 	}
 }
 
-func (p *parser) List(first Expression) (Expression, error) {
+func (p *parser) List(first AST) (AST, error) {
 	list := List{}
 
 	// Because lists and list constructors share their starts
@@ -526,7 +492,7 @@ func (p *parser) List(first Expression) (Expression, error) {
 	return list, nil
 }
 
-func (p *parser) ListConstructor(head Expression) (Match, error) {
+func (p *parser) ListConstructor(head AST) (AST, error) {
 	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
 		return nil, errors.New("List constructors must have a colon ':' separating the head and tail expressions")
 	}
@@ -544,46 +510,7 @@ func (p *parser) ListConstructor(head Expression) (Match, error) {
 	return ListConstructor{Head: head, Tail: tail}, nil
 }
 
-func (p *parser) Slice() (Expression, error) {
-	m := NewMark(p)
-	slice := Slice{}
-
-	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_OPEN) {
-		return nil, m.Error("Slice must be enclosed by brackets '[' ']'")
-	}
-
-	if p.Peek().kind != TOKEN_KIND_COLON {
-		low, err := p.Expression([]int{TOKEN_KIND_COLON})
-
-		if err != nil {
-			return nil, err
-		}
-
-		slice.Low = low
-	}
-
-	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
-		return nil, m.Error("Slice bounds must be separated by a colon ':'")
-	}
-
-	if p.Peek().kind != TOKEN_KIND_BRACKET_CLOSE {
-		high, err := p.Expression([]int{TOKEN_KIND_BRACKET_CLOSE})
-
-		if err != nil {
-			return nil, err
-		}
-
-		slice.High = high
-	}
-
-	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
-		return nil, m.Error("Slice must be enclosed by brackets '[' ']'")
-	}
-
-	return slice, nil
-}
-
-func (p *parser) Where(id Identifier) (Match, error) {
+func (p *parser) Where(id Identifier) (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
@@ -607,18 +534,18 @@ func (p *parser) Where(id Identifier) (Match, error) {
 	return NewWhere(id, body)
 }
 
-func (p *parser) Pattern() (Expression, error) {
+func (p *parser) Pattern() (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_BRACE_OPEN) {
 		return nil, m.Error("Pattern must be enclosed by braces '{' '}'")
 	}
 
-	matchBodies := [][]Match{}
-	bodies := []Expression{}
+	matchBodies := [][]AST{}
+	bodies := []AST{}
 
 	for !p.ConsumeIfNext(TOKEN_KIND_BRACE_CLOSE) {
-		matches := []Match{}
+		matches := []AST{}
 		isImplicitBody := false
 
 		if p.ConsumeIfNext(TOKEN_KIND_FAT_ARROW) {
@@ -653,7 +580,7 @@ func (p *parser) Pattern() (Expression, error) {
 				return nil, errors.New("Pattern can only have one implicit true match")
 			}
 
-			falseMatches := []Match{}
+			falseMatches := []AST{}
 
 			for range matches {
 				id, _ := NewIdentifier("_")
@@ -685,7 +612,7 @@ func (p *parser) Pattern() (Expression, error) {
 	return NewPattern(matchBodies, bodies)
 }
 
-func (p *parser) Match() (Match, error) {
+func (p *parser) Match() (AST, error) {
 	m := NewMark(p)
 
 	switch p.Peek().kind {
@@ -777,7 +704,7 @@ func (p *parser) Match() (Match, error) {
 	}
 }
 
-func (p *parser) PrimaryExpr(endTokenKinds []int) (Expression, error) {
+func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		id, _ := NewIdentifier(string(p.Next().value))
 
@@ -832,9 +759,9 @@ func (p *parser) PrimaryExpr(endTokenKinds []int) (Expression, error) {
 	return nil, errors.New("Unexpected error occured when parsing an expression")
 }
 
-func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error) {
+func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 	if precedence >= len(opPrecedence) {
-		exprs := []Expression{}
+		exprs := []AST{}
 
 		for {
 			next, err := p.PrimaryExpr(endTokenKinds)
@@ -874,7 +801,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error)
 
 		return Application{Body: exprs}, nil
 	} else {
-		var head Expression
+		var head AST
 		var err error
 		head, err = p.OpExpr(precedence+1, append(append([]int{}, opPrecedence[precedence]...), endTokenKinds...))
 
@@ -911,7 +838,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error)
 						return nil, err
 					}
 
-					head = Application{Body: []Expression{Identifier{Value: string(t.value)}, head, next}}
+					head = Application{Body: []AST{Identifier{Value: string(t.value)}, head, next}}
 					break
 				}
 			}
@@ -925,7 +852,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (Expression, error)
 	}
 }
 
-func (p *parser) Expression(endTokenKinds []int) (Expression, error) {
+func (p *parser) Expression(endTokenKinds []int) (AST, error) {
 	// Start parsing with default ender tokens
 	expr, err := p.OpExpr(0, append(endTokenKinds, []int{TOKEN_KIND_EOF, TOKEN_KIND_SEMI_COLON}...))
 
@@ -940,7 +867,7 @@ func (p *parser) Expression(endTokenKinds []int) (Expression, error) {
 	return expr, nil
 }
 
-func Parse(src []byte) (Expression, error) {
+func Parse(src []byte) (AST, error) {
 	p := parser{
 		src,
 		1,

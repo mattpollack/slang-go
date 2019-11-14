@@ -1,4 +1,7 @@
 
+
+# recursion binds to expression
+
 map = {
   state .get s -> state s
   state .set s -> {
@@ -11,12 +14,15 @@ map = {
 
 map = map { _ -> .nil }
 
+_ = print_ast map     
+
 test = map
-test = test.set.derp 10
 
-# _ = print_ast (test.get.derp)
-_ = test.set.herp
+_ = print_ast (test.set.derp)
 
-print "\ndone!\n"
+#test = test.set.derp 10
+#_ = print_ast (test.get.derp)
+
+print_ast "\ndone!\n"
 
 
