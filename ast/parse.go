@@ -121,19 +121,62 @@ func (m *mark) Done() parser {
 	return p
 }
 
-func (m *mark) Error(msg string) error {
+func (m *mark) Error(msg string) string {
 	msg = fmt.Sprintf("[%d:%d] %s", m.a.line, m.a.char, msg)
-	src := fmt.Sprintf("%s\n", string(m.Done().src))
+	/*
+		src := fmt.Sprintf("%s\n", string(m.Done().src))
 
-	for i := 1; i < m.a.char; i++ {
-		src += " "
+		for i := 1; i < m.a.char; i++ {
+			src += " "
+		}
+
+		src += "^"
+
+		msg = fmt.Sprintf("%s\n%s", src, msg)*/
+
+	return msg
+}
+
+type ParseError struct {
+	wrapped error
+	message string
+}
+
+func NewParseError(wrapped error, message string) *ParseError {
+	return &ParseError{
+		wrapped,
+		message,
+	}
+}
+
+func (e *ParseError) Error() string {
+	messages := []string{}
+
+	var err error = e
+
+	for ; err != nil; err = errors.Unwrap(err) {
+		if perr, ok := err.(*ParseError); ok {
+			messages = append(messages, perr.message)
+		} else {
+			messages = append(messages, err.Error())
+		}
 	}
 
-	src += "^"
+	if num := 4; len(messages) > num {
+		messages = messages[len(messages)-num:]
+	}
 
-	msg = fmt.Sprintf("%s\n%s", src, msg)
+	message := "PARSE ERROR:\n"
 
-	return errors.New(msg)
+	for i := len(messages) - 1; i >= 0; i-- {
+		message += fmt.Sprintf(" > %s\n", messages[i])
+	}
+
+	return message
+}
+
+func (e *ParseError) Unwrap() error {
+	return e.wrapped
 }
 
 func (p *parser) SkipWS() {
@@ -410,19 +453,19 @@ func (p *parser) MatchExpr() (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_MATCH) {
-		return nil, m.Error("Match must begin with 'match'")
+		return nil, NewParseError(nil, m.Error("Match must begin with 'match'"))
 	}
 
 	toMatch, err := p.Expression([]int{TOKEN_KIND_BRACE_OPEN})
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, m.Error("Cannot parse expression in match expression"))
 	}
 
 	with, err := p.Pattern()
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, m.Error("Cannot parse pattern in match expression"))
 	}
 
 	return NewApplication([]AST{with, toMatch})
@@ -432,19 +475,19 @@ func (p *parser) Let(identifier Identifier) (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
-		return nil, m.Error("'=' must follow identifier in let")
+		return nil, NewParseError(nil, m.Error("'=' must follow identifier in let"))
 	}
 
 	value, err := p.Expression([]int{})
 
 	if err != nil {
-		return nil, m.Error("Let must be assigned a value")
+		return nil, NewParseError(err, m.Error("Let must be assigned a value"))
 	}
 
 	body, err := p.Expression([]int{})
 
 	if err != nil {
-		return nil, m.Error("Let must have a body")
+		return nil, NewParseError(err, m.Error("Let must have a body"))
 	}
 
 	// If the body is a let expression, merge them
@@ -465,6 +508,8 @@ func (p *parser) Let(identifier Identifier) (AST, error) {
 }
 
 func (p *parser) List(first AST) (AST, error) {
+	m := NewMark(p)
+
 	list := List{}
 
 	// Because lists and list constructors share their starts
@@ -478,7 +523,7 @@ func (p *parser) List(first AST) (AST, error) {
 			val, err := p.Expression([]int{TOKEN_KIND_COMMA, TOKEN_KIND_BRACKET_CLOSE})
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse expression in list"))
 			}
 
 			list.Values = append(list.Values, val)
@@ -489,7 +534,7 @@ func (p *parser) List(first AST) (AST, error) {
 
 			// NOTE: !p.Peek().firstOfLine &&
 			if !p.ConsumeIfNext(TOKEN_KIND_COMMA) {
-				return nil, errors.New("Values in a list must be separated by commas or new lines")
+				return nil, NewParseError(nil, m.Error("Cannot parse comma in list"))
 			}
 		}
 	}
@@ -498,56 +543,62 @@ func (p *parser) List(first AST) (AST, error) {
 }
 
 func (p *parser) ListConstructor(head AST) (AST, error) {
+	m := NewMark(p)
+
 	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
-		return nil, errors.New("List constructors must have a colon ':' separating the head and tail expressions")
+		return nil, NewParseError(nil, m.Error("List constructors must have a colon ':' separating the head and tail expressions"))
 	}
 
 	tail, err := p.Expression([]int{TOKEN_KIND_BRACKET_CLOSE})
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, m.Error("Cannot parse expression in list constructor"))
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
-		return nil, errors.New("List constructors must be enclosed by brackets '[' ']'")
+		return nil, NewParseError(nil, m.Error("List constructors must be enclosed by brackets '[' ']'"))
 	}
 
 	return ListConstructor{Head: head, Tail: tail}, nil
 }
 
-func (p *parser) Where(id Identifier) (AST, error) {
+func (p *parser) Where(match AST) (AST, error) {
 	m := NewMark(p)
 
 	constantTime := false
 
-	if !p.ConsumeIfNext(TOKEN_KIND_DOUBLE_COLON) {
+	switch p.Peek().kind {
+	case TOKEN_KIND_COLON:
+		p.Next()
+	case TOKEN_KIND_DOUBLE_COLON:
+		p.Next()
 		constantTime = true
-	} else if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
-		return nil, m.Error("Colon must separate where identifier from body")
+	default:
+		return nil, NewParseError(nil, m.Error("Where must start with a colon"))
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_OPEN) {
-		return nil, m.Error("Where body must be enclosed by parenthesis '(' ')'")
+		return nil, NewParseError(nil, m.Error("Where body must be enclosed by parenthesis '(' ')'"))
 	}
 
 	body, err := p.Expression([]int{TOKEN_KIND_PAREN_CLOSE})
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, m.Error("Cannot parse expression in where"))
 	}
 
 	if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
-		return nil, m.Error("Where body must be enclosed by parenthesis '(' ')'")
+		return nil, NewParseError(nil, m.Error("Where body must be enclosed by parenthesis '(' ')'"))
 	}
 
-	return NewWhere(id, body, constantTime)
+	return NewWhere(match, body, constantTime)
 }
 
 func (p *parser) Pattern() (AST, error) {
 	m := NewMark(p)
 
 	if !p.ConsumeIfNext(TOKEN_KIND_BRACE_OPEN) {
-		return nil, m.Error("Pattern must be enclosed by braces '{' '}'")
+		return nil, NewParseError(nil, m.Error("Pattern must be enclosed by braces '{' '}'"))
 	}
 
 	matchBodies := [][]AST{}
@@ -559,7 +610,7 @@ func (p *parser) Pattern() (AST, error) {
 
 		if p.ConsumeIfNext(TOKEN_KIND_FAT_ARROW) {
 			if len(matchBodies) == 0 {
-				return nil, errors.New("Default pattern match cannot be the first body")
+				return nil, NewParseError(nil, m.Error("Default pattern match cannot be the first body"))
 			}
 
 			for range matchBodies[0] {
@@ -571,7 +622,7 @@ func (p *parser) Pattern() (AST, error) {
 				match, err := p.Match()
 
 				if err != nil {
-					return nil, err
+					return nil, NewParseError(err, m.Error("Cannot parse match in pattern"))
 				}
 
 				matches = append(matches, match)
@@ -586,7 +637,7 @@ func (p *parser) Pattern() (AST, error) {
 		// Add missing values for implicit body
 		if isImplicitBody {
 			if len(matchBodies) != 0 {
-				return nil, errors.New("Pattern can only have one implicit true match")
+				return nil, NewParseError(nil, m.Error("Pattern can only have one implicit true match"))
 			}
 
 			falseMatches := []AST{}
@@ -606,11 +657,11 @@ func (p *parser) Pattern() (AST, error) {
 			body, err := p.Expression([]int{TOKEN_KIND_BRACE_CLOSE})
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse expression in pattern"))
 			}
 
 			if len(matchBodies) > 0 && len(matches) != len(matchBodies[0]) {
-				return nil, errors.New("Pattern cannot take varying arguments")
+				return nil, NewParseError(err, m.Error("Pattern cannot take varying arguments"))
 			}
 
 			matchBodies = append(matchBodies, matches)
@@ -621,99 +672,119 @@ func (p *parser) Pattern() (AST, error) {
 	return NewPattern(matchBodies, bodies)
 }
 
+// REFACTOR: where should apply to
 func (p *parser) Match() (AST, error) {
 	m := NewMark(p)
 
 	switch p.Peek().kind {
-	// Could be where or identifier
 	case TOKEN_KIND_IDENTIFIER:
-		m, err := p.Identifier()
+		match, err := p.Identifier()
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse identifier in match"))
 		}
 
+		// Match possible where after identifier
 		if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
-			m, err := p.Where(m.(Identifier))
+			matchWhere, err := p.Where(match)
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse where in match"))
 			}
 
-			return m, nil
+			return matchWhere, nil
 		}
 
-		return m.(Identifier), nil
+		return match.(Identifier), nil
 
 	case TOKEN_KIND_LABEL:
-		m, err := p.Label()
+		match, err := p.Label()
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse label in match"))
 		}
 
-		return m.(Label), nil
+		return match.(Label), nil
 
 	case TOKEN_KIND_STRING:
-		m, err := p.String()
+		match, err := p.String()
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse string in match"))
 		}
 
-		return m.(String), nil
+		return match.(String), nil
 
 	case TOKEN_KIND_NUMBER:
-		m, err := p.Number()
+		match, err := p.Number()
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse number in match"))
 		}
 
-		return m.(Number), nil
+		return match.(Number), nil
 
 	// Lists and list constructors: open bracket and an expression
 	case TOKEN_KIND_BRACKET_OPEN:
 		p.Next()
 
 		if p.Peek().kind == TOKEN_KIND_BRACKET_CLOSE {
-			m, err := p.List(nil)
+			match, err := p.List(nil)
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse list in match"))
 			}
 
-			return m.(List), nil
+			return match.(List), nil
 		}
 
 		if p.Peek().kind == TOKEN_KIND_COLON {
-			return nil, errors.New("List constructor cannot have an empty head value")
+			return nil, NewParseError(nil, m.Error("List constructor cannot have an empty head value"))
 		}
 
 		expr, err := p.Expression([]int{TOKEN_KIND_COLON, TOKEN_KIND_COMMA, TOKEN_KIND_BRACKET_CLOSE})
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse expression in match"))
 		}
 
 		if p.Peek().kind == TOKEN_KIND_COLON {
-			return p.ListConstructor(expr)
-		} else {
-			m, err := p.List(expr)
+			lc, err := p.ListConstructor(expr)
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse list constructor in match"))
 			}
 
-			return m.(List), nil
+			// Parse where after list constructor
+			if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
+				match, err := p.Where(lc)
+
+				if err != nil {
+					return nil, NewParseError(err, m.Error("Cannot parse where in match"))
+				}
+
+				return match, nil
+			}
+
+			return lc, nil
+		} else {
+			match, err := p.List(expr)
+
+			if err != nil {
+				return nil, NewParseError(err, m.Error("Cannot parse list in match"))
+			}
+
+			return match.(List), nil
 		}
 
 	default:
-		return nil, m.Error("Unexpected error occured when parsing match")
+		return nil, NewParseError(nil, m.Error("Unexpected error occured when parsing match"))
 	}
 }
 
 func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {
+	m := NewMark(p)
+
 	if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
 		id, _ := NewIdentifier(string(p.Next().value))
 
@@ -749,11 +820,11 @@ func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {
 		res, err := p.Expression([]int{TOKEN_KIND_PAREN_CLOSE})
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse expression in primary expression"))
 		}
 
 		if !p.ConsumeIfNext(TOKEN_KIND_PAREN_CLOSE) {
-			return nil, errors.New("Application which starts with an open parenthesis must close with one")
+			return nil, NewParseError(nil, m.Error("Application which starts with an open parenthesis must close with one"))
 		}
 
 		return res, nil
@@ -765,10 +836,12 @@ func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {
 		return p.List(nil)
 	}
 
-	return nil, errors.New("Unexpected error occured when parsing an expression")
+	return nil, NewParseError(nil, m.Error("Unexpected error occured when parsing an expression"))
 }
 
 func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
+	m := NewMark(p)
+
 	if precedence >= len(opPrecedence) {
 		exprs := []AST{}
 
@@ -776,7 +849,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 			next, err := p.PrimaryExpr(endTokenKinds)
 
 			if err != nil {
-				return nil, err
+				return nil, NewParseError(err, m.Error("Cannot parse primary expression in op expression"))
 			}
 
 			exprs = append(exprs, next)
@@ -801,7 +874,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 		}
 
 		if len(exprs) == 0 {
-			return nil, errors.New("Cannot parse primary expression")
+			return nil, NewParseError(nil, m.Error("Cannot parse primary expression"))
 		}
 
 		if len(exprs) == 1 {
@@ -815,7 +888,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 		head, err = p.OpExpr(precedence+1, append(append([]int{}, opPrecedence[precedence]...), endTokenKinds...))
 
 		if err != nil {
-			return nil, err
+			return nil, NewParseError(err, m.Error("Cannot parse op expression in primary expression"))
 		}
 
 		for !p.Peek().firstOfLine {
@@ -844,7 +917,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 					next, err := p.OpExpr(precedence+1, append(append([]int{}, opPrecedence[precedence]...), endTokenKinds...))
 
 					if err != nil {
-						return nil, err
+						return nil, NewParseError(err, m.Error("Cannot parse op expression in primary expression"))
 					}
 
 					head = Application{Body: []AST{Identifier{Value: string(t.value)}, head, next}}
@@ -853,7 +926,7 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 			}
 
 			if !foundOp {
-				return nil, errors.New("Unexpected token found when attempting to parse operator")
+				return nil, NewParseError(nil, m.Error("Unexpected token found when attempting to parse operator"))
 			}
 		}
 
@@ -862,11 +935,13 @@ func (p *parser) OpExpr(precedence int, endTokenKinds []int) (AST, error) {
 }
 
 func (p *parser) Expression(endTokenKinds []int) (AST, error) {
+	m := NewMark(p)
+
 	// Start parsing with default ender tokens
 	expr, err := p.OpExpr(0, append(endTokenKinds, []int{TOKEN_KIND_EOF, TOKEN_KIND_SEMI_COLON}...))
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, m.Error("Cannot parse op expression in expression"))
 	}
 
 	if p.Peek().kind == TOKEN_KIND_SEMI_COLON {
@@ -886,11 +961,11 @@ func Parse(src []byte) (AST, error) {
 	ast, err := p.Expression([]int{})
 
 	if err != nil {
-		return nil, err
+		return nil, NewParseError(err, "Cannot parse base expression")
 	}
 
 	if p.Next().kind != TOKEN_KIND_EOF {
-		return nil, fmt.Errorf("[%d:%d] Unexpected end of parsing", p.line, p.char)
+		return nil, NewParseError(nil, fmt.Sprintf("[%d:%d] Unexpected end of parsing", p.line, p.char))
 	}
 
 	return ast, nil

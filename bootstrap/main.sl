@@ -1,7 +1,7 @@
 
 # USER LIBRARY
 
-struct = {
+record = {
   members ->
     next = {
       []     state v -> state v
@@ -19,5 +19,30 @@ map = {
 }
 
 # PROGRAM
+
+token_t = record [
+  .line,
+  .char,
+  .value
+]
+
+scanners =
+  scan_word = {
+    word -> {
+      [word:_] -> len word
+               => 0
+    }
+  }
+
+  scan_identifier = {
+    [c:cs] : ((c >= "a" && c <= "z") ||
+              (c >= "A" && c <= "Z") ||
+               c == "_") -> 1 + scan_identifier cs
+                         => 0
+  }
+
+  map scan_word ["{", "}"] ++ [scan_identifier]
+
+_ = map { n -> print (n "{") } scanners
 
 print "done!"

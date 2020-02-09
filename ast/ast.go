@@ -131,14 +131,14 @@ func NewLet(ids []Identifier, vs []AST, b AST) (Let, error) {
 }
 
 type Where struct {
-	Id           Identifier
+	Match        AST
 	Condition    AST
 	ConstantTime bool
 }
 
-func NewWhere(i Identifier, c AST, ct bool) (Where, error) {
+func NewWhere(m AST, c AST, ct bool) (Where, error) {
 	return Where{
-		i,
+		m,
 		c,
 		ct,
 	}, nil
@@ -302,7 +302,7 @@ func (e Let) String() []string {
 }
 
 func (e Where) String() []string {
-	return []string{"TODO Where"}
+	return []string{strings.Join(append(append(append([]string{}, e.Match.String()...), ":"), e.Condition.String()...), " ")}
 }
 
 func (e Builtin) String() []string {
@@ -409,12 +409,7 @@ func (A Let) Equals(b interface{}) bool {
 }
 
 func (A Where) Equals(b interface{}) bool {
-	switch B := b.(type) {
-	case Where:
-		return A.Id.Equals(B.Id) && A.Condition.Equals(B.Condition)
-	}
-
-	return false
+	panic("TODO")
 }
 
 func (A Builtin) Equals(b interface{}) bool {
@@ -504,7 +499,7 @@ func (a Let) Copy() AST {
 
 func (a Where) Copy() AST {
 	return Where{
-		a.Id.Copy().(Identifier),
+		a.Match.Copy(),
 		a.Condition.Copy(),
 		a.ConstantTime,
 	}
@@ -699,11 +694,25 @@ func (a Pattern) Apply(val AST) (AST, *RuntimeError) {
 
 func patternMatch(env *Environment, ast Pattern, res Pattern, m AST, val AST) bool {
 	switch match := m.(type) {
+	case Where:
+		if patternMatch(env, ast, res, match.Match, val) {
+			res, err := match.Condition.Eval(env)
+
+			return err == nil && res.Equals(Label{Value: "true"})
+		}
+
 	case ListConstructor:
 		// Match for a list
 		if list, ok := val.(List); ok {
 			if len(list.Values) > 0 {
 				return patternMatch(env, ast, res, match.Head, list.Values[0]) && patternMatch(env, ast, res, match.Tail, List{list.Values[1:]})
+			}
+		}
+
+		// Match for a string
+		if str, ok := val.(String); ok {
+			if len(str.Value) > 0 {
+				return patternMatch(env, ast, res, match.Head, String{string(str.Value[0])}) && patternMatch(env, ast, res, match.Tail, String{str.Value[1:]})
 			}
 		}
 

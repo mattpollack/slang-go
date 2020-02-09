@@ -75,6 +75,18 @@ var libFns = []Builtin{
 			return a, nil
 		},
 	},
+
+	{
+		"len",
+		func(a AST, env *Environment) (AST, *RuntimeError) {
+			switch A := a.(type) {
+			case String:
+				return Number{len(A.Value)}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't find the length of non-string type")
+		},
+	},
 }
 
 var StdLib = NewEnv(nil)
