@@ -32,8 +32,25 @@ func main() {
 			return
 		}
 
-		AST, err := ast.Parse(src)
-		AST.Print(0)
+		prog, err := ast.Parse(src)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		ast.Print(prog)
+
+		fmt.Println("--- RESULT ---------------------------------")
+
+		prog, err = prog.Eval(ast.StdLib)
+
+		fmt.Println("--------------------------------------------")
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
 	default:
 		fmt.Println("Unexpected number of args")
 	}

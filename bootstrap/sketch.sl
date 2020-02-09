@@ -1,28 +1,35 @@
 
 
-# recursion binds to expression
-
-map = {
-  state .get s -> state s
-  state .set s -> {
-    v -> map {
-      s -> v
-      k -> state k
+struct = {
+  members ->
+    next = {
+      []     state v -> state v
+      [m:ms] state v -> next ms {
+        m -> v
+        n -> state n
+      }
     }
-  }
+    next members { _ -> .doesnt_exist }
 }
 
-map = map { _ -> .nil }
+token = struct [
+  .char,
+  .line,
+  .val
+]
 
-_ = print_ast map     
+next = token 1 1 "{"
 
-test = map
+_ = print (next.char)
+_ = print (next.line)
+_ = print (next.val)
 
-_ = print_ast (test.set.derp)
+print "done\n"
 
-#test = test.set.derp 10
-#_ = print_ast (test.get.derp)
+#derp = {
+#  v -> {
+#    v -> v + 1
+#  }
+#}
 
-print_ast "\ndone!\n"
-
-
+#print (derp 10 10)

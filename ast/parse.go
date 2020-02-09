@@ -25,6 +25,7 @@ const (
 	TOKEN_KIND_OP_LOGICAL_AND
 	TOKEN_KIND_OP_LOGICAL_OR
 	TOKEN_KIND_OP_APPEND
+	TOKEN_KIND_DOUBLE_COLON
 
 	TOKEN_KIND_BRACE_OPEN
 	TOKEN_KIND_BRACE_CLOSE
@@ -198,6 +199,7 @@ func (p *parser) Next() token {
 		"&&",
 		"||",
 		"++",
+		"::",
 		"{", "}",
 		"(", ")",
 		"[", "]",
@@ -371,12 +373,15 @@ func (p *parser) String() (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_STRING {
 		str := string(p.Next().value)
 
-		for i := 0; i < len(str); i++ {
-			switch {
-			case strings.HasPrefix(str[i:], "\\n"):
-				str = str[:i] + "\n" + str[i+2:]
-			case strings.HasPrefix(str[i:], "\\t"):
-				str = str[:i] + "\t" + str[i+2:]
+		// NOTE: DISABLED ESCAPE CHARS
+		if false {
+			for i := 0; i < len(str); i++ {
+				switch {
+				case strings.HasPrefix(str[i:], "\\n"):
+					str = str[:i] + "\n" + str[i+2:]
+				case strings.HasPrefix(str[i:], "\\t"):
+					str = str[:i] + "\t" + str[i+2:]
+				}
 			}
 		}
 
@@ -513,7 +518,11 @@ func (p *parser) ListConstructor(head AST) (AST, error) {
 func (p *parser) Where(id Identifier) (AST, error) {
 	m := NewMark(p)
 
-	if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
+	constantTime := false
+
+	if !p.ConsumeIfNext(TOKEN_KIND_DOUBLE_COLON) {
+		constantTime = true
+	} else if !p.ConsumeIfNext(TOKEN_KIND_COLON) {
 		return nil, m.Error("Colon must separate where identifier from body")
 	}
 
@@ -531,7 +540,7 @@ func (p *parser) Where(id Identifier) (AST, error) {
 		return nil, m.Error("Where body must be enclosed by parenthesis '(' ')'")
 	}
 
-	return NewWhere(id, body)
+	return NewWhere(id, body, constantTime)
 }
 
 func (p *parser) Pattern() (AST, error) {
@@ -624,7 +633,7 @@ func (p *parser) Match() (AST, error) {
 			return nil, err
 		}
 
-		if p.Peek().kind == TOKEN_KIND_COLON {
+		if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
 			m, err := p.Where(m.(Identifier))
 
 			if err != nil {
