@@ -3,12 +3,12 @@ package ast
 var libFns = []Builtin{
 	{
 		"+",
-		func(a AST, env *Environment) (AST, *RuntimeError) {
+		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
 			case Number:
 				return Builtin{
 					"+ curried",
-					func(b AST, env *Environment) (AST, *RuntimeError) {
+					func(b AST, env *Environment) (AST, error) {
 						switch B := b.(type) {
 						case Number:
 							return Number{A.Value + B.Value}, nil
@@ -24,13 +24,57 @@ var libFns = []Builtin{
 	},
 
 	{
+		"*",
+		func(a AST, env *Environment) (AST, error) {
+			switch A := a.(type) {
+			case Number:
+				return Builtin{
+					"* curried",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case Number:
+							return Number{A.Value * B.Value}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't multiply non-integer type")
+					},
+				}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't multiply non-integer type")
+		},
+	},
+
+	{
+		"/",
+		func(a AST, env *Environment) (AST, error) {
+			switch A := a.(type) {
+			case Number:
+				return Builtin{
+					"/ curried",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case Number:
+							return Number{A.Value / B.Value}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't divide non-integer type")
+					},
+				}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't divide non-integer type")
+		},
+	},
+
+	{
 		"-",
-		func(a AST, env *Environment) (AST, *RuntimeError) {
+		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
 			case Number:
 				return Builtin{
 					"- curried",
-					func(b AST, env *Environment) (AST, *RuntimeError) {
+					func(b AST, env *Environment) (AST, error) {
 						switch B := b.(type) {
 						case Number:
 							return Number{A.Value - B.Value}, nil
@@ -46,13 +90,39 @@ var libFns = []Builtin{
 	},
 
 	{
+		">",
+		func(a AST, env *Environment) (AST, error) {
+			switch A := a.(type) {
+			case Number:
+				return Builtin{
+					"> curried",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case Number:
+							if A.Value > B.Value {
+								return Label{"true"}, nil
+							}
+
+							return Label{"false"}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't apply greater than on non-integer type")
+					},
+				}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't apply greater than on non-integer type")
+		},
+	},
+
+	{
 		"++",
-		func(a AST, env *Environment) (AST, *RuntimeError) {
+		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
 			case List:
 				return Builtin{
 					"++ curried",
-					func(b AST, env *Environment) (AST, *RuntimeError) {
+					func(b AST, env *Environment) (AST, error) {
 						switch B := b.(type) {
 						case List:
 							return List{append(append([]AST{}, A.Values...), B.Values...)}, nil
@@ -69,7 +139,7 @@ var libFns = []Builtin{
 
 	{
 		"print",
-		func(a AST, env *Environment) (AST, *RuntimeError) {
+		func(a AST, env *Environment) (AST, error) {
 			Print(a)
 
 			return a, nil
@@ -78,7 +148,7 @@ var libFns = []Builtin{
 
 	{
 		"len",
-		func(a AST, env *Environment) (AST, *RuntimeError) {
+		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
 			case String:
 				return Number{len(A.Value)}, nil

@@ -34,10 +34,41 @@ type AST interface {
 	Strings
 	Equals
 
-	Eval(*Environment) (AST, *RuntimeError)
-	Apply(AST) (AST, *RuntimeError)
+	Eval(*Environment) (AST, error)
+	Apply(AST) (AST, error)
 
 	Copy() AST
+}
+
+// Package name and imports
+type SourceFileImport struct {
+	Path string
+	Name string
+}
+
+type SourceFile struct {
+	PackageName string
+	Imports     []SourceFileImport
+	Definition  AST
+}
+
+func (s *SourceFile) Print() {
+	fmt.Printf("package %s\n", s.PackageName)
+	fmt.Println()
+
+	for _, imp := range s.Imports {
+		fmt.Printf("import \"%s\"", imp.Path)
+
+		if imp.Name != "" {
+			fmt.Printf(" as %s", imp.Name)
+		}
+
+		fmt.Println()
+	}
+
+	fmt.Println()
+
+	Print(s.Definition)
 }
 
 type Application struct {
@@ -154,7 +185,7 @@ func addTab(str string) string {
 
 type Builtin struct {
 	name  string
-	apply func(AST, *Environment) (AST, *RuntimeError)
+	apply func(AST, *Environment) (AST, error)
 }
 
 // -- Strings -------------------------
@@ -516,24 +547,24 @@ type RuntimeError struct {
 	message string
 }
 
-func NewRuntimeError(wrapped error, message string) *RuntimeError {
-	return &RuntimeError{
+func NewRuntimeError(wrapped error, message string) RuntimeError {
+	return RuntimeError{
 		wraps:   wrapped,
 		message: message,
 	}
 }
 
-func (r *RuntimeError) Unwrap() error {
+func (r RuntimeError) Unwrap() error {
 	return r.wraps
 }
 
-func (r *RuntimeError) Error() string {
+func (r RuntimeError) Error() string {
 	messages := []string{}
 
 	var err error = r
 
 	for ; err != nil; err = errors.Unwrap(err) {
-		if rerr, ok := err.(*RuntimeError); ok {
+		if rerr, ok := err.(RuntimeError); ok {
 			messages = append(messages, rerr.message)
 		} else {
 			messages = append(messages, err.Error())
@@ -576,7 +607,7 @@ func (e *Environment) Get(key string) (AST, bool) {
 
 // -- EVAL ------------------------------
 
-func (a Application) Eval(env *Environment) (AST, *RuntimeError) {
+func (a Application) Eval(env *Environment) (AST, error) {
 	res, err := a.Body[0].Eval(env)
 
 	if err != nil {
@@ -600,7 +631,7 @@ func (a Application) Eval(env *Environment) (AST, *RuntimeError) {
 	return res, nil
 }
 
-func (a Pattern) Eval(env *Environment) (AST, *RuntimeError) {
+func (a Pattern) Eval(env *Environment) (AST, error) {
 	for range a.Bodies {
 		a.Envs = append(a.Envs, NewEnv(env))
 	}
@@ -608,7 +639,7 @@ func (a Pattern) Eval(env *Environment) (AST, *RuntimeError) {
 	return a, nil
 }
 
-func (a Identifier) Eval(env *Environment) (AST, *RuntimeError) {
+func (a Identifier) Eval(env *Environment) (AST, error) {
 	if v, ok := env.Get(a.Value); ok {
 		return v, nil
 	}
@@ -616,10 +647,10 @@ func (a Identifier) Eval(env *Environment) (AST, *RuntimeError) {
 	return nil, NewRuntimeError(nil, fmt.Sprintf("Cannot get value for identifier '%s'", a.Value))
 }
 
-func (a Number) Eval(*Environment) (AST, *RuntimeError) { return a, nil }
-func (a Label) Eval(*Environment) (AST, *RuntimeError)  { return a, nil }
-func (a String) Eval(*Environment) (AST, *RuntimeError) { return a, nil }
-func (a List) Eval(env *Environment) (AST, *RuntimeError) {
+func (a Number) Eval(*Environment) (AST, error) { return a, nil }
+func (a Label) Eval(*Environment) (AST, error)  { return a, nil }
+func (a String) Eval(*Environment) (AST, error) { return a, nil }
+func (a List) Eval(env *Environment) (AST, error) {
 	res := List{}
 
 	for _, valAst := range a.Values {
@@ -634,8 +665,8 @@ func (a List) Eval(env *Environment) (AST, *RuntimeError) {
 
 	return res, nil
 }
-func (a ListConstructor) Eval(*Environment) (AST, *RuntimeError) { panic("TODO eval list con") }
-func (a Let) Eval(env *Environment) (AST, *RuntimeError) {
+func (a ListConstructor) Eval(*Environment) (AST, error) { panic("TODO eval list con") }
+func (a Let) Eval(env *Environment) (AST, error) {
 	env = NewEnv(env)
 
 	for i, id := range a.BoundIds {
@@ -650,25 +681,25 @@ func (a Let) Eval(env *Environment) (AST, *RuntimeError) {
 
 	return a.Body.Eval(env)
 }
-func (a Where) Eval(*Environment) (AST, *RuntimeError)   { panic("TODO eval where") }
-func (a Builtin) Eval(*Environment) (AST, *RuntimeError) { panic("TODO eval built") }
+func (a Where) Eval(*Environment) (AST, error)   { panic("TODO eval where") }
+func (a Builtin) Eval(*Environment) (AST, error) { panic("TODO eval built") }
 
 // -- APPLY -----------------------------
 
-func (a Application) Apply(b AST) (AST, *RuntimeError)     { panic("TODO apply app") }
-func (a Identifier) Apply(b AST) (AST, *RuntimeError)      { panic("TODO apply id") }
-func (a Label) Apply(b AST) (AST, *RuntimeError)           { panic("TODO apply lab") }
-func (a String) Apply(b AST) (AST, *RuntimeError)          { panic("TODO apply str") }
-func (a List) Apply(b AST) (AST, *RuntimeError)            { panic("TODO apply list") }
-func (a ListConstructor) Apply(b AST) (AST, *RuntimeError) { panic("TODO apply list con") }
-func (a Number) Apply(b AST) (AST, *RuntimeError)          { panic("TODO apply num") }
-func (a Let) Apply(b AST) (AST, *RuntimeError)             { panic("TODO apply let") }
-func (a Where) Apply(b AST) (AST, *RuntimeError)           { panic("TODO apply where") }
-func (a Builtin) Apply(b AST) (AST, *RuntimeError) {
+func (a Application) Apply(b AST) (AST, error)     { panic("TODO apply app") }
+func (a Identifier) Apply(b AST) (AST, error)      { panic("TODO apply id") }
+func (a Label) Apply(b AST) (AST, error)           { panic("TODO apply lab") }
+func (a String) Apply(b AST) (AST, error)          { panic("TODO apply str") }
+func (a List) Apply(b AST) (AST, error)            { panic("TODO apply list") }
+func (a ListConstructor) Apply(b AST) (AST, error) { panic("TODO apply list con") }
+func (a Number) Apply(b AST) (AST, error)          { panic("TODO apply num") }
+func (a Let) Apply(b AST) (AST, error)             { panic("TODO apply let") }
+func (a Where) Apply(b AST) (AST, error)           { panic("TODO apply where") }
+func (a Builtin) Apply(b AST) (AST, error) {
 	return a.apply(b, nil)
 }
 
-func (a Pattern) Apply(val AST) (AST, *RuntimeError) {
+func (a Pattern) Apply(val AST) (AST, error) {
 	res, _ := NewPattern([][]AST{}, []AST{})
 
 	for i, matchGroup := range a.Matches {

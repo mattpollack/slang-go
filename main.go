@@ -9,6 +9,48 @@ import (
 	"./ast"
 )
 
+func loadFile(path string) (*ast.SourceFile, error) {
+	// TODO: fix relative pathing
+	src, err := ioutil.ReadFile(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	srcFile, err := ast.Parse(src)
+
+	if err != nil {
+		return nil, err
+	}
+
+	env := ast.NewEnv(ast.StdLib)
+
+	for _, imp := range srcFile.Imports {
+		impSrcFile, err := loadFile(imp.Path)
+
+		// ERRORING HERE???????????
+		if err != nil {
+			return nil, err
+		}
+
+		name := imp.Name
+
+		if name == "" {
+			name = impSrcFile.PackageName
+		}
+
+		env.Set(name, impSrcFile.Definition)
+	}
+
+	srcFile.Definition, err = srcFile.Definition.Eval(env)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return srcFile, nil
+}
+
 func main() {
 	// Timer
 	startTime := time.Now()
@@ -18,39 +60,14 @@ func main() {
 
 	switch len(os.Args) {
 	case 2:
-		/*
-			defer func() {
-				if err := recover(); err != nil {
-					fmt.Printf("Runtime Error (%s)\n", err)
-				}
-			}()*/
-
-		src, err := ioutil.ReadFile(os.Args[1])
+		// Read queue, loaded with first file
+		_, err := loadFile(os.Args[1])
 
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		prog, err := ast.Parse(src)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		ast.Print(prog)
-
-		fmt.Println("--- RESULT ---------------------------------")
-
-		prog, err = prog.Eval(ast.StdLib)
-
-		fmt.Println("--------------------------------------------")
-
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
 	default:
 		fmt.Println("Unexpected number of args")
 	}

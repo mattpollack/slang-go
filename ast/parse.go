@@ -12,10 +12,13 @@ const (
 	_ = iota
 
 	// Reserved sorted by length
+	TOKEN_KIND_PACKAGE
+	TOKEN_KIND_IMPORT
 	TOKEN_KIND_MATCH
 	TOKEN_KIND_ELSE
 
 	TOKEN_KIND_IF
+	TOKEN_KIND_AS
 	TOKEN_KIND_FAT_ARROW
 	TOKEN_KIND_ARROW
 	TOKEN_KIND_OP_EQUALS
@@ -230,9 +233,12 @@ func (p *parser) Next() token {
 
 	// Parse reserved
 	for i, s := range []string{
+		"package",
+		"import",
 		"match",
 		"else",
 		"if",
+		"as",
 		"=>",
 		"->",
 		"==",
@@ -259,7 +265,7 @@ func (p *parser) Next() token {
 	} {
 		if bytes.HasPrefix(p.src, []byte(s)) {
 			token := token{
-				TOKEN_KIND_MATCH + i,
+				i + 1,
 				[]byte(s),
 				p.line,
 				p.char,
@@ -951,11 +957,52 @@ func (p *parser) Expression(endTokenKinds []int) (AST, error) {
 	return expr, nil
 }
 
-func Parse(src []byte) (AST, error) {
+func Parse(src []byte) (*SourceFile, error) {
 	p := parser{
 		src,
 		1,
 		1,
+	}
+
+	// Parse package then imports
+	if !p.ConsumeIfNext(TOKEN_KIND_PACKAGE) {
+		return nil, NewParseError(nil, "Must begin with a package name")
+	}
+
+	if p.Peek().kind != TOKEN_KIND_IDENTIFIER {
+		return nil, NewParseError(nil, "Package name must be an identifier")
+	}
+
+	file := &SourceFile{}
+	file.PackageName = string(p.Next().value)
+
+	// Parse all imports
+	for p.ConsumeIfNext(TOKEN_KIND_IMPORT) {
+		if p.Peek().kind != TOKEN_KIND_STRING {
+			return nil, NewParseError(nil, "Import path must be a string")
+		}
+
+		path := string(p.Next().value)
+
+		if len(path) < 3 || path[len(path)-3:] != ".sl" {
+			return nil, NewParseError(nil, "Invalid path string specified")
+		}
+
+		name := ""
+
+		if p.ConsumeIfNext(TOKEN_KIND_AS) {
+			if p.Peek().kind != TOKEN_KIND_IDENTIFIER {
+				return nil, NewParseError(nil, "Import name must be an identifier")
+			}
+
+			name = string(p.Next().value)
+		}
+
+		if name == "_" {
+			return nil, NewParseError(nil, "Import name can't be discarded (_)")
+		}
+
+		file.Imports = append(file.Imports, SourceFileImport{path, name})
 	}
 
 	ast, err := p.Expression([]int{})
@@ -968,5 +1015,7 @@ func Parse(src []byte) (AST, error) {
 		return nil, NewParseError(nil, fmt.Sprintf("[%d:%d] Unexpected end of parsing", p.line, p.char))
 	}
 
-	return ast, nil
+	file.Definition = ast
+
+	return file, nil
 }

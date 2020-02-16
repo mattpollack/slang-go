@@ -1,26 +1,8 @@
+package main
 
-# USER LIBRARY
+import "./bootstrap/std.sl"
 
-record = {
-  members ->
-    next = {
-      []     state v -> state v
-      [m:ms] state v -> next ms {
-        m -> v
-        n -> state n
-      }
-    }
-    next members { _ -> .doesnt_exist }
-}
-
-map = {
-  _  []     -> []
-  fn [x:xs] -> [fn x] ++ map fn xs
-}
-
-# PROGRAM
-
-token_t = record [
+token_t = std.struct [
   .line,
   .char,
   .value
@@ -29,20 +11,13 @@ token_t = record [
 scanners =
   scan_word = {
     word -> {
-      [word:_] -> len word
-               => 0
+      [word:next] -> [word, next]
+                  => ["",   next]
     }
   }
 
-  scan_identifier = {
-    [c:cs] : ((c >= "a" && c <= "z") ||
-              (c >= "A" && c <= "Z") ||
-               c == "_") -> 1 + scan_identifier cs
-                         => 0
-  }
+  std.map scan_word ["{", "}"]
 
-  map scan_word ["{", "}"] ++ [scan_identifier]
+_ = print scanners
 
-_ = map { n -> print (n "{") } scanners
-
-print "done!"
+print "ok"
