@@ -360,7 +360,7 @@ func (A Application) Equals(b interface{}) bool {
 }
 
 func (A Pattern) Equals(b interface{}) bool {
-	panic("TODO pattern equal")
+	return false
 }
 
 func (A Identifier) Equals(b interface{}) bool {
@@ -590,7 +590,9 @@ func NewEnv(parent *Environment) *Environment {
 }
 
 func (e *Environment) Set(key string, val AST) {
-	e.bound[key] = val
+	if key != "_" {
+		e.bound[key] = val
+	}
 }
 
 func (e *Environment) Get(key string) (AST, bool) {
@@ -686,10 +688,14 @@ func (a Builtin) Eval(*Environment) (AST, error) { panic("TODO eval built") }
 
 // -- APPLY -----------------------------
 
-func (a Application) Apply(b AST) (AST, error)     { panic("TODO apply app") }
-func (a Identifier) Apply(b AST) (AST, error)      { panic("TODO apply id") }
-func (a Label) Apply(b AST) (AST, error)           { panic("TODO apply lab") }
-func (a String) Apply(b AST) (AST, error)          { panic("TODO apply str") }
+func (a Application) Apply(b AST) (AST, error) { panic("TODO apply app") }
+func (a Identifier) Apply(b AST) (AST, error)  { panic("TODO apply id") }
+func (a Label) Apply(b AST) (AST, error) {
+	return nil, NewRuntimeError(nil, "Cannot apply value to label")
+}
+func (a String) Apply(b AST) (AST, error) {
+	return nil, NewRuntimeError(nil, "Cannot apply value to string")
+}
 func (a List) Apply(b AST) (AST, error)            { panic("TODO apply list") }
 func (a ListConstructor) Apply(b AST) (AST, error) { panic("TODO apply list con") }
 func (a Number) Apply(b AST) (AST, error)          { panic("TODO apply num") }
@@ -713,6 +719,11 @@ func (a Pattern) Apply(val AST) (AST, error) {
 	}
 
 	if len(res.Matches) == 0 {
+		fmt.Println("---------------")
+		Print(a)
+		Print(val)
+		fmt.Println("---------------")
+
 		return nil, NewRuntimeError(nil, "Unable to match any values to pattern")
 	}
 
@@ -730,6 +741,19 @@ func patternMatch(env *Environment, ast Pattern, res Pattern, m AST, val AST) bo
 			res, err := match.Condition.Eval(env)
 
 			return err == nil && res.Equals(Label{Value: "true"})
+		}
+
+	case List:
+		if list, ok := val.(List); ok {
+			if len(match.Values) == len(list.Values) {
+				for i := range list.Values {
+					if !patternMatch(env, ast, res, match.Values[i], list.Values[i]) {
+						return false
+					}
+				}
+
+				return true
+			}
 		}
 
 	case ListConstructor:

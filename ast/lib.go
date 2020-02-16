@@ -121,7 +121,7 @@ var libFns = []Builtin{
 			switch A := a.(type) {
 			case List:
 				return Builtin{
-					"++ curried",
+					"++ curried-list",
 					func(b AST, env *Environment) (AST, error) {
 						switch B := b.(type) {
 						case List:
@@ -131,6 +131,20 @@ var libFns = []Builtin{
 						return nil, NewRuntimeError(nil, "Can't concatenate non-list type")
 					},
 				}, nil
+
+			case String:
+				return Builtin{
+					"++ curried-string",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case String:
+							return String{A.Value + B.Value}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't concatenate non-list type")
+					},
+				}, nil
+
 			}
 
 			return nil, NewRuntimeError(nil, "Can't concatenate non-list type")

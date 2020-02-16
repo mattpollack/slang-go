@@ -1,23 +1,37 @@
 package main
 
 import "./bootstrap/std.sl"
+import "./bootstrap/data.sl"
 
-token_t = std.struct [
-  .line,
-  .char,
-  .value
-]
+lexer =
+  lexer_t = data.struct [
+    .prev_token,
+    .src
+  ]
 
-scanners =
   scan_word = {
-    word -> {
-      [word:next] -> [word, next]
-                  => ["",   next]
-    }
+    prefix str ->
+      scan_loop = {
+        ""     suffix -> data.some suffix
+        [p:ps] [p:ss] -> scan_loop ps ss
+      }
+
+      match scan_loop prefix str {
+        [.none]         -> data.none
+        [.some, suffix] -> data.some (lexer_t prefix suffix)
+      }
   }
 
-  std.map scan_word ["{", "}"]
+  _ = match scan_word "hello" "hello, world!" {
+    [.none]        -> print ":("
+    [.some, lexer] ->
+      _ = print (lexer.prev_token)
+      print (lexer.src)
+      
+  }
 
-_ = print scanners
+  std.map scan_word ["{", "}", "[", "]"]
+
+_ = print lexer     
 
 print "ok"

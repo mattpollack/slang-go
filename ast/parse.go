@@ -531,7 +531,6 @@ func (p *parser) List(first AST) (AST, error) {
 			if err != nil {
 				return nil, NewParseError(err, m.Error("Cannot parse expression in list"))
 			}
-
 			list.Values = append(list.Values, val)
 
 			if p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
@@ -773,7 +772,7 @@ func (p *parser) Match() (AST, error) {
 			}
 
 			return lc, nil
-		} else {
+		} else if p.ConsumeIfNext(TOKEN_KIND_COMMA) {
 			match, err := p.List(expr)
 
 			if err != nil {
@@ -781,6 +780,10 @@ func (p *parser) Match() (AST, error) {
 			}
 
 			return match.(List), nil
+		} else if p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
+			return List{Values: []AST{expr}}, nil
+		} else {
+			return nil, NewParseError(nil, m.Error("Unable to parse list or list constructor in match expression"))
 		}
 
 	default:
