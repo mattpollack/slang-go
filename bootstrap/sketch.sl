@@ -1,5 +1,6 @@
 package main
 
-match [1,2,"ac"] {
-  [1, 2, y] -> print y
+match [1, 2, [1, 2, 3]]
+{
+  [1, 2, [1: x]] -> print x
 }
