@@ -28,7 +28,7 @@ lexer =
     "{",
     "}",
     "[",
-    "]",
+    "]"
   ]
 
   lexer = {
@@ -94,6 +94,5 @@ _ = print (parser.current.value)
 
 parser = parser.next
 _ = print (parser.current.value)
-
 
 print "ok"
