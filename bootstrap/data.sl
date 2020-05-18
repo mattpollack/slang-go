@@ -1,7 +1,7 @@
 package data
 
 # Arbitrary key value pairs are great but are better when they pattern match 
-struct = {
+record = {
   members ->
     next = {
       []     state v -> state v
@@ -13,14 +13,18 @@ struct = {
     next members { _ -> .no_record }
 }
 
-pair = struct [.is_pair, .a, .b] .true
-
 none = [.none]
 some = { x -> [.some, x] }
 
+error = {
+  .fail    v -> [.fail, v]
+  .success v -> [.success, v]
+}
+
 {
-  .struct -> struct
+  .record -> record
   .pair   -> pair
   .none   -> none
   .some   -> some
+  .error  -> error
 }

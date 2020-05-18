@@ -43,6 +43,7 @@ const (
 	TOKEN_KIND_OP_SUBTRACT
 	TOKEN_KIND_OP_MULTIPLY
 	TOKEN_KIND_OP_DIVIDE
+	TOKEN_KIND_OP_MODULO
 	TOKEN_KIND_OP_GREATER_THAN
 	TOKEN_KIND_OP_LESS_THAN
 
@@ -65,6 +66,7 @@ var opPrecedence [][]int = [][]int{
 	[]int{
 		TOKEN_KIND_OP_MULTIPLY,
 		TOKEN_KIND_OP_DIVIDE,
+		TOKEN_KIND_OP_MODULO,
 	},
 	[]int{
 		TOKEN_KIND_OP_APPEND,
@@ -259,6 +261,7 @@ func (p *parser) Next() token {
 		"-",
 		"*",
 		"/",
+		"%",
 		">",
 		"<",
 		";",
@@ -677,70 +680,54 @@ func (p *parser) Pattern() (AST, error) {
 	return NewPattern(matchBodies, bodies)
 }
 
-// REFACTOR: where should apply to
+// REFACTOR: where should apply to all match exprs
 func (p *parser) Match() (AST, error) {
 	m := NewMark(p)
 
+	var match AST
+	var err error
+
 	switch p.Peek().kind {
 	case TOKEN_KIND_IDENTIFIER:
-		match, err := p.Identifier()
+		match, err = p.Identifier()
 
 		if err != nil {
 			return nil, NewParseError(err, m.Error("Cannot parse identifier in match"))
 		}
 
-		// Match possible where after identifier
-		if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
-			matchWhere, err := p.Where(match)
-
-			if err != nil {
-				return nil, NewParseError(err, m.Error("Cannot parse where in match"))
-			}
-
-			return matchWhere, nil
-		}
-
-		return match.(Identifier), nil
-
 	case TOKEN_KIND_LABEL:
-		match, err := p.Label()
+		match, err = p.Label()
 
 		if err != nil {
 			return nil, NewParseError(err, m.Error("Cannot parse label in match"))
 		}
 
-		return match.(Label), nil
-
 	case TOKEN_KIND_STRING:
-		match, err := p.String()
+		match, err = p.String()
 
 		if err != nil {
 			return nil, NewParseError(err, m.Error("Cannot parse string in match"))
 		}
 
-		return match.(String), nil
-
 	case TOKEN_KIND_NUMBER:
-		match, err := p.Number()
+		match, err = p.Number()
 
 		if err != nil {
 			return nil, NewParseError(err, m.Error("Cannot parse number in match"))
 		}
-
-		return match.(Number), nil
 
 	// Lists and list constructors: open bracket and an expression
 	case TOKEN_KIND_BRACKET_OPEN:
 		p.Next()
 
 		if p.Peek().kind == TOKEN_KIND_BRACKET_CLOSE {
-			match, err := p.List(nil)
+			match, err = p.List(nil)
 
 			if err != nil {
 				return nil, NewParseError(err, m.Error("Cannot parse list in match"))
 			}
 
-			return match.(List), nil
+			break
 		}
 
 		if p.Peek().kind == TOKEN_KIND_COLON {
@@ -754,34 +741,19 @@ func (p *parser) Match() (AST, error) {
 		}
 
 		if p.Peek().kind == TOKEN_KIND_COLON {
-			lc, err := p.ListConstructor(expr)
+			match, err = p.ListConstructor(expr)
 
 			if err != nil {
 				return nil, NewParseError(err, m.Error("Cannot parse list constructor in match"))
 			}
-
-			// Parse where after list constructor
-			if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
-				match, err := p.Where(lc)
-
-				if err != nil {
-					return nil, NewParseError(err, m.Error("Cannot parse where in match"))
-				}
-
-				return match, nil
-			}
-
-			return lc, nil
 		} else if p.ConsumeIfNext(TOKEN_KIND_COMMA) {
-			match, err := p.List(expr)
+			match, err = p.List(expr)
 
 			if err != nil {
 				return nil, NewParseError(err, m.Error("Cannot parse list in match"))
 			}
-
-			return match.(List), nil
 		} else if p.ConsumeIfNext(TOKEN_KIND_BRACKET_CLOSE) {
-			return List{Values: []AST{expr}}, nil
+			match = List{Values: []AST{expr}}
 		} else {
 			return nil, NewParseError(nil, m.Error("Unable to parse list or list constructor in match expression"))
 		}
@@ -789,6 +761,19 @@ func (p *parser) Match() (AST, error) {
 	default:
 		return nil, NewParseError(nil, m.Error("Unexpected error occured when parsing match"))
 	}
+
+	// Match possible where after identifier
+	if p.Peek().kind == TOKEN_KIND_COLON || p.Peek().kind == TOKEN_KIND_DOUBLE_COLON {
+		matchWhere, err := p.Where(match)
+
+		if err != nil {
+			return nil, NewParseError(err, m.Error("Cannot parse where in match"))
+		}
+
+		return matchWhere, nil
+	}
+
+	return match, nil
 }
 
 func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {

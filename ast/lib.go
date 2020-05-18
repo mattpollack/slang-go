@@ -68,6 +68,28 @@ var libFns = []Builtin{
 	},
 
 	{
+		"%",
+		func(a AST, env *Environment) (AST, error) {
+			switch A := a.(type) {
+			case Number:
+				return Builtin{
+					"% curried",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case Number:
+							return Number{A.Value % B.Value}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't modulo non-integer type")
+					},
+				}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't modulo non-integer type")
+		},
+	},
+
+	{
 		"-",
 		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
@@ -112,6 +134,32 @@ var libFns = []Builtin{
 			}
 
 			return nil, NewRuntimeError(nil, "Can't apply greater than on non-integer type")
+		},
+	},
+
+	{
+		"==",
+		func(a AST, env *Environment) (AST, error) {
+			switch A := a.(type) {
+			case Number:
+				return Builtin{
+					"== curried",
+					func(b AST, env *Environment) (AST, error) {
+						switch B := b.(type) {
+						case Number:
+							if A.Value == B.Value {
+								return Label{"true"}, nil
+							}
+
+							return Label{"false"}, nil
+						}
+
+						return nil, NewRuntimeError(nil, "Can't apply equal on non-integer type")
+					},
+				}, nil
+			}
+
+			return nil, NewRuntimeError(nil, "Can't apply equal on this type")
 		},
 	},
 

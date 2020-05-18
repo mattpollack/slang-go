@@ -21,10 +21,28 @@ foldl = {
   f z [m:ms] -> foldl f (f z m) ms
 }
 
+unfoldr = {
+  f z ->
+    match f z {
+      [.some, [v, s]] -> [v] ++ unfoldr f s
+                      => []
+    }
+}
+
+unfoldl = {
+  f z ->
+    match f z {
+      [.some, [v, s]] -> unfoldl f s ++ [v]
+                      => []
+    }
+}
+
 # Reflection use-case
 {
-  .map    -> map
-  .filter -> filter
-  .foldr  -> foldr
-  .foldl  -> foldl
+  .map     -> map
+  .filter  -> filter
+  .foldr   -> foldr
+  .foldl   -> foldl
+  .unfoldr -> unfoldr
+  .unfoldl -> unfoldl
 }
