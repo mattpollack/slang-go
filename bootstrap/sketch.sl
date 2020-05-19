@@ -1,26 +1,34 @@
-package main
+package sketch
 
-import "./bootstrap/std.sl"
-import "./bootstrap/data.sl"
 
-fizzbuzz = {
-  n ->
-    pairs = [
-      [3, "fizz"],
-      [5, "buzz"]
-    ]
+# Exploring defunctionalization
+_ = 
+  a = 10
 
-    # Interesting parse case
-    match (std.foldr {
-      [m, a] : (match n % m {0}) s -> a ++ s
-                               _ s -> s
-    } "" pairs) {
-      "" -> n
-       s -> s
-    }
-}
+  f = {
+    a ->
+      a = 15
+      {
+        b -> a + b
+      }
+  }
 
-print (std.unfoldr {
-  30 -> data.none
-  n -> data.some [fizzbuzz n, n + 1]
-} 1)
+  print (f 10 1)
+
+# Turns into
+#_ = 
+#  a = 10
+
+#  _f = {
+#    _a b -> _a + b
+#  }
+
+#  f = {
+#    a ->
+#      a = 15
+#      _f a
+#  }
+
+#  print (f 10 1)
+
+print "ok"

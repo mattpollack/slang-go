@@ -1,5 +1,12 @@
 package ast
 
+import (
+	"fmt"
+)
+
+// Protect import because I'm lazy
+var _ interface{} = fmt.Println
+
 var libFns = []Builtin{
 	{
 		"+",

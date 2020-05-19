@@ -52,6 +52,18 @@ type SourceFile struct {
 	Definition  AST
 }
 
+func (s *SourceFile) Eval(env *Environment) (AST, error) {
+	ast, err := Defun(s.Definition)
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.Definition = ast
+
+	return s.Definition.Eval(env)
+}
+
 func (s *SourceFile) Print() {
 	fmt.Printf("package %s\n", s.PackageName)
 	fmt.Println()

@@ -42,7 +42,7 @@ func loadFile(path string) (*ast.SourceFile, error) {
 		env.Set(name, impSrcFile.Definition)
 	}
 
-	srcFile.Definition, err = srcFile.Definition.Eval(env)
+	srcFile.Definition, err = srcFile.Eval(env)
 
 	if err != nil {
 		return nil, err
