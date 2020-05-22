@@ -7,6 +7,22 @@ import (
 // Protect import because I'm lazy
 var _ interface{} = fmt.Println
 
+var isLib = map[string]bool{}
+
+func IsBuiltin(v string) bool {
+	if _, ok := isLib[v]; ok {
+		return true
+	}
+
+	return false
+}
+
+func init() {
+	for _, b := range libFns {
+		isLib[b.name] = true
+	}
+}
+
 var libFns = []Builtin{
 	{
 		"+",

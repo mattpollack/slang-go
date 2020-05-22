@@ -53,11 +53,15 @@ type SourceFile struct {
 }
 
 func (s *SourceFile) Eval(env *Environment) (AST, error) {
-	ast, err := Defun(s.Definition)
+	ast, err := Defun(s.Definition, env)
 
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("************")
+	Print(ast)
+	fmt.Println("************")
 
 	s.Definition = ast
 
@@ -527,11 +531,11 @@ func (a Number) Copy() AST {
 func (a Let) Copy() AST {
 	res := Let{}
 
-	for _, id := range res.BoundIds {
+	for _, id := range a.BoundIds {
 		res.BoundIds = append(res.BoundIds, id.Copy().(Identifier))
 	}
 
-	for _, ast := range res.BoundValues {
+	for _, ast := range a.BoundValues {
 		res.BoundValues = append(res.BoundValues, ast.Copy())
 	}
 
@@ -599,6 +603,22 @@ type Environment struct {
 
 func NewEnv(parent *Environment) *Environment {
 	return &Environment{parent, map[string]AST{}}
+}
+
+func (e *Environment) HasDef() map[string]bool {
+	var res map[string]bool
+
+	if e.parent != nil {
+		res = e.parent.HasDef()
+	} else {
+		res = map[string]bool{}
+	}
+
+	for k := range e.bound {
+		res[k] = true
+	}
+
+	return res
 }
 
 func (e *Environment) Set(key string, val AST) {
