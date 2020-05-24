@@ -11,24 +11,9 @@ _ =
       {
         b -> a + b
       }
+    => 1
   }
 
   print (f 10 1)
-
-# Turns into
-#_ = 
-#  a = 10
-
-#  _f = {
-#    _a b -> _a + b
-#  }
-
-#  f = {
-#    a ->
-#      a = 15
-#      _f a
-#  }
-
-#  print (f 10 1)
 
 print "ok"
