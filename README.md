@@ -42,7 +42,21 @@ f = {
 print "This is all you need!"
 ```
 
-Patterns open up deconstruction of these valuse.
+Labels are static enum like values which start with `.`. Labels bind tightly when not followed by a space.
+
+```
+# True and false are just labels
+.true == (1 == 1)
+
+data = {
+  .a -> "Data!"
+}
+
+# data.a is evaluated first because of label binding rules
+print data.a
+```
+
+Patterns open up deconstruction of these values.
 
 ```
 add_pair = {
@@ -59,3 +73,4 @@ data = [1, 2]
 
 add_pair data == add_list data
 ```
+
