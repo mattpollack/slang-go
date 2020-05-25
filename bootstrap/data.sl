@@ -1,6 +1,8 @@
 package data
 
-# Arbitrary key value pairs are great but are better when they pattern match 
+none = [.none]
+some = { x -> [.some, x] }
+
 record = {
   members ->
     next = {
@@ -12,9 +14,6 @@ record = {
     }
     next members { _ -> .no_record }
 }
-
-none = [.none]
-some = { x -> [.some, x] }
 
 error = {
   .fail    v -> [.fail, v]

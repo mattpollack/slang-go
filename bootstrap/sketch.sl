@@ -1,19 +1,12 @@
 package sketch
 
+f = {
+  str ->
+    g = {
+      9 -> str
+      n -> g (n + 1)
+    }
+    g
+}
 
-# Exploring defunctionalization
-_ = 
-  a = 10
-
-  f = {
-    a ->
-      a = 15
-      {
-        b -> a + b
-      }
-    => 1
-  }
-
-  print (f 10 1)
-
-print "ok"
+print ( f "done!" 0 )

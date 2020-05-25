@@ -53,17 +53,19 @@ type SourceFile struct {
 }
 
 func (s *SourceFile) Eval(env *Environment) (AST, error) {
-	ast, err := Defun(s.Definition, env)
+	if defun := true; defun {
+		ast, err := Defun(s.Definition, env)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Println("************")
+		Print(ast)
+		fmt.Println("************")
+
+		s.Definition = ast
 	}
-
-	fmt.Println("************")
-	Print(ast)
-	fmt.Println("************")
-
-	s.Definition = ast
 
 	return s.Definition.Eval(env)
 }
@@ -167,6 +169,11 @@ type Let struct {
 	BoundIds    []Identifier
 	BoundValues []AST
 	Body        AST
+}
+
+func (l *Let) Bind(i Identifier, v AST) {
+	l.BoundIds = append(l.BoundIds, i)
+	l.BoundValues = append(l.BoundValues, v)
 }
 
 func NewLet(ids []Identifier, vs []AST, b AST) (Let, error) {
