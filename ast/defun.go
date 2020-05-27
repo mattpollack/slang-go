@@ -169,8 +169,11 @@ func (v *DefunVisitor) VisitLet(let Let) (AST, error) {
 		}
 
 		// TODO: [ ]
-		// Look for applications that reference themselves
-		// ...
+		// Recursive calls are generating bad applications like:
+		//   g = ( '1 str g )
+		// If an application is recursive, it needs to pass a reference of itself, including all parent bound values
+		//   g = ( '1 str )
+		//   h = g g
 	}
 
 	var err error

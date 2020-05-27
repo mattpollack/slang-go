@@ -73,4 +73,3 @@ data = [1, 2]
 
 add_pair data == add_list data
 ```
-
