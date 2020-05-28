@@ -433,7 +433,9 @@ func (A List) Equals(b interface{}) bool {
 }
 
 func (A ListConstructor) Equals(b interface{}) bool {
-	panic("TODO list constructor equals")
+	fmt.Println("NOTE: attempted listconstructor equals")
+
+	return false
 }
 
 func (A Number) Equals(b interface{}) bool {

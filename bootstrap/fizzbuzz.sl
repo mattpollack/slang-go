@@ -1,7 +1,23 @@
 package fizzbuzz
 
-import "./bootstrap/std.sl"
-import "./bootstrap/data.sl"
+#import "./bootstrap/std.sl"
+#import "./bootstrap/data.sl"
+
+none = [.none]
+some = { x -> [.some, x] }
+
+foldr = {
+  _ z []     -> z
+  f z [m:ms] -> f m (foldr f z ms)
+}
+
+unfoldr = {
+  f z ->
+    match f z {
+      [.some, [v, s]] -> [v] ++ unfoldr f s
+                      => []
+    }
+}
 
 fizzbuzz = {
   a ->
@@ -10,7 +26,7 @@ fizzbuzz = {
       [5, "buzz"]
     ]
 
-    match (std.foldr {
+    match (foldr {
       [n, affix] : ((a % n) == 0) str -> affix ++ str
                                 _ str -> str
     } "" affixes) {
@@ -19,9 +35,9 @@ fizzbuzz = {
     }
 }
 
-std.unfoldr {
-  50 -> data.none
+unfoldr {
+  100 -> none
    n ->
      _ = print (fizzbuzz n)
-     data.some [.nil, n + 1]
+     some [.nil, n + 1]
 } 1
