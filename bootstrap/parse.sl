@@ -3,7 +3,7 @@ package parse
 # NOTE: Because of the import bug
 data = {
   .some -> { v -> [.some, v] }
-	.none -> [.none]
+  .none -> [.none]
 }
 
 # NOTE: Because of the import bug
