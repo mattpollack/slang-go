@@ -161,30 +161,47 @@ var libFns = []Builtin{
 	},
 
 	{
-		"==",
+		"||",
 		func(a AST, env *Environment) (AST, error) {
 			switch A := a.(type) {
-			case Number:
+			case Label:
 				return Builtin{
-					"== curried",
+					"|| curried",
 					func(b AST, env *Environment) (AST, error) {
 						switch B := b.(type) {
-						case Number:
-							if A.Value == B.Value {
+						case Label:
+							if A.Value == "true" || B.Value == "true" {
 								return Label{"true"}, nil
 							}
 
 							return Label{"false"}, nil
 						}
 
-						return nil, NewRuntimeError(nil, "Can't apply equal on non-integer type")
+						return nil, NewRuntimeError(nil, "Can't apply boolean or on non-boolean type")
 					},
 				}, nil
 			}
 
-			return nil, NewRuntimeError(nil, "Can't apply equal on this type")
+			return nil, NewRuntimeError(nil, "Can't apply boolean or on non-boolean type")
 		},
 	},
+
+	{
+		"==",
+		func(a AST, env *Environment) (AST, error) {
+			return Builtin{
+				"== curried",
+				func(b AST, env *Environment) (AST, error) {
+					if a.Equals(b) {
+						return Label{"true"}, nil
+					}
+
+					return Label{"false"}, nil
+				},
+			}, nil
+		},
+	},
+
 
 	{
 		"++",

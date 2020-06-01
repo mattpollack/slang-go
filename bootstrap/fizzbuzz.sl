@@ -36,8 +36,8 @@ fizzbuzz = {
 }
 
 unfoldr {
-  100 -> none
-   n ->
+  1 -> none
+  n ->
      _ = print (fizzbuzz n)
      some [.nil, n + 1]
 } 1
