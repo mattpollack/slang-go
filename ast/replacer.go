@@ -42,9 +42,27 @@ func (v *Replacer) Visit(a AST) (AST, error) {
 	case Let:
 		return v.VisitLet(A)
 	case Where:
+		return v.VisitWhere(A)
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unhandled ast kind '%s' passed to Replacer", reflect.TypeOf(a).Name()))
+}
+
+func (v *Replacer) VisitWhere(where Where) (AST, error) {
+	var err error
+	where.Match, err = v.Visit(where.Match)
+
+	if err != nil {
+		return nil, err
+	}
+
+	where.Condition, err = v.Visit(where.Condition)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return where, nil
 }
 
 func (v *Replacer) VisitListConstructor(listCons ListConstructor) (AST, error) {

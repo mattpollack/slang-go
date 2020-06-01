@@ -425,15 +425,14 @@ func (p *parser) String() (AST, error) {
 	if p.Peek().kind == TOKEN_KIND_STRING {
 		str := string(p.Next().value)
 
-		// NOTE: DISABLED ESCAPE CHARS
-		if false {
-			for i := 0; i < len(str); i++ {
-				switch {
-				case strings.HasPrefix(str[i:], "\\n"):
-					str = str[:i] + "\n" + str[i+2:]
-				case strings.HasPrefix(str[i:], "\\t"):
-					str = str[:i] + "\t" + str[i+2:]
-				}
+		for i := 0; i < len(str); i++ {
+			switch {
+			case strings.HasPrefix(str[i:], "\\r"):
+				str = str[:i] + "\r" + str[i+2:]
+			case strings.HasPrefix(str[i:], "\\n"):
+				str = str[:i] + "\n" + str[i+2:]
+			case strings.HasPrefix(str[i:], "\\t"):
+				str = str[:i] + "\t" + str[i+2:]
 			}
 		}
 

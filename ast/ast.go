@@ -53,7 +53,7 @@ type SourceFile struct {
 }
 
 func (s *SourceFile) Eval(env *Environment) (AST, error) {
-	if defun := true; defun {
+	if defun := false; defun {
 		ast, err := Defun(s.Definition, env)
 
 		if err != nil {
@@ -465,7 +465,9 @@ func (A Let) Equals(b interface{}) bool {
 }
 
 func (A Where) Equals(b interface{}) bool {
-	panic("TODO")
+	fmt.Println("NOTE: attempted where equals")
+
+	return false
 }
 
 func (A Builtin) Equals(b interface{}) bool {
@@ -737,7 +739,9 @@ func (a Label) Apply(b AST) (AST, error) {
 func (a String) Apply(b AST) (AST, error) {
 	return nil, NewRuntimeError(nil, "Cannot apply value to string")
 }
-func (a List) Apply(b AST) (AST, error)            { panic("TODO apply list") }
+func (a List) Apply(b AST) (AST, error)            {
+	return nil, NewRuntimeError(nil, "Cannot apply value to list")
+}
 func (a ListConstructor) Apply(b AST) (AST, error) { panic("TODO apply list con") }
 func (a Number) Apply(b AST) (AST, error)          { panic("TODO apply num") }
 func (a Let) Apply(b AST) (AST, error)             { panic("TODO apply let") }
@@ -785,16 +789,24 @@ func patternMatch(env *Environment, ast Pattern, res Pattern, m AST, val AST) bo
 		}
 
 	case List:
-		if list, ok := val.(List); ok {
-			if len(match.Values) == len(list.Values) {
-				for i := range list.Values {
-					if !patternMatch(env, ast, res, match.Values[i], list.Values[i]) {
+		switch V := val.(type) {
+		case List:
+			if len(match.Values) == len(V.Values) {
+				for i := range V.Values {
+					if !patternMatch(env, ast, res, match.Values[i], V.Values[i]) {
 						return false
 					}
 				}
 
 				return true
 			}
+
+		case String:
+			if len(match.Values) == 0 && len(V.Value) == 0 {
+				return true
+			}
+
+			// NOTE: can we do better comparisons?
 		}
 
 	case ListConstructor:

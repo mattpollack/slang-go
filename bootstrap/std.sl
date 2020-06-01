@@ -11,6 +11,15 @@ filter = {
   f [_:ms]         -> filter f ms
 }
 
+find = {
+  _ []     -> data.none
+  f [m:ms] ->
+    match f m {
+      [.none] -> find f ms
+      some    -> some
+    }
+}
+
 foldr = {
   _ z []     -> z
   f z [m:ms] -> f m (foldr f z ms)

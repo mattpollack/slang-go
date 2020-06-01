@@ -202,6 +202,21 @@ var libFns = []Builtin{
 		},
 	},
 
+	{
+		"!=",
+		func(a AST, env *Environment) (AST, error) {
+			return Builtin{
+				"!= curried",
+				func(b AST, env *Environment) (AST, error) {
+					if !a.Equals(b) {
+						return Label{"true"}, nil
+					}
+
+					return Label{"false"}, nil
+				},
+			}, nil
+		},
+	},
 
 	{
 		"++",

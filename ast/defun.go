@@ -18,7 +18,7 @@ func Defun(in AST, env *Environment) (AST, error) {
 	hasDef := env.HasDef()
 
 	// TODO: Fix issue related to import binding
-	// TODO: Fix issue where recursive calls need to be replaced in all new bindings, not just the most recent
+	// TODO: Fix issue where recursive calls need to be replaced in all new bindings, not just the parent
 
 	// Visit inLet bound
 	for i := range inLet.BoundIds {
