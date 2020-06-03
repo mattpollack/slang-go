@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func Defun(in AST, env *Environment) (AST, error) {
+func Defun(in AST) (AST, error) {
 	if _, ok := in.(Let); !ok {
 		in, _ = NewLet([]Identifier{}, []AST{}, in)
 	}
@@ -15,9 +15,8 @@ func Defun(in AST, env *Environment) (AST, error) {
 	inLet := in.(Let)
 	resLet, _ := NewLet([]Identifier{}, []AST{}, nil)
 	nextUniqueId := 0
-	hasDef := env.HasDef()
+	hasDef := map[string]bool{}
 
-	// TODO: Fix issue related to import binding
 	// TODO: Fix issue where recursive calls need to be replaced in all new bindings, not just the parent
 
 	// Visit inLet bound
@@ -117,6 +116,10 @@ func (v *DefunVisitor) Bind(id Identifier, body AST) {
 }
 
 func (v *DefunVisitor) Visit(a AST) (AST, error) {
+	if a == nil {
+		panic("DefunVisitor passed nil")
+	}
+
 	switch A := a.(type) {
 	case Application:
 		return v.VisitApplication(A)
@@ -136,6 +139,8 @@ func (v *DefunVisitor) Visit(a AST) (AST, error) {
 	case Let:
 		return v.VisitLet(A)
 	case Where:
+	case Builtin:
+		return a, nil
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unhandled ast kind '%s' passed to DefunVisitor", reflect.TypeOf(a).Name()))
@@ -307,6 +312,10 @@ func (v *FreeVarsVisitor) markFree(id string) {
 }
 
 func (v *FreeVarsVisitor) Visit(a AST) error {
+	if a == nil {
+		panic("FreeVarsVisitor passed nil")
+	}
+
 	switch A := a.(type) {
 	case Application:
 		return v.VisitApplication(A)

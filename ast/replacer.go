@@ -18,6 +18,10 @@ func Replace(ast AST, replaced AST, replacement AST) (AST, error) {
 }
 
 func (v *Replacer) Visit(a AST) (AST, error) {
+	if a == nil {
+		return nil, nil
+	}
+
 	if a.Equals(v.replaced) {
 		return v.replacement.Copy(), nil
 	}

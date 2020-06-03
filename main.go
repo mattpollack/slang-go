@@ -23,7 +23,7 @@ func loadFile(path string) (*ast.SourceFile, error) {
 		return nil, err
 	}
 
-	env := ast.NewEnv(ast.StdLib)
+	let, _ := ast.NewLet([]ast.Identifier{}, []ast.AST{}, nil)
 
 	for _, imp := range srcFile.Imports {
 		impSrcFile, err := loadFile(imp.Path)
@@ -39,10 +39,14 @@ func loadFile(path string) (*ast.SourceFile, error) {
 			name = impSrcFile.PackageName
 		}
 
-		env.Set(name, impSrcFile.Definition)
+		let.Bind(ast.Identifier{name}, impSrcFile.Definition)
 	}
 
-	srcFile.Definition, err = srcFile.Eval(env)
+	let.Body = srcFile.Definition
+	lib := ast.StdLib.Copy().(ast.Let)
+	lib.Body = let
+	srcFile.Definition = lib
+	srcFile.Definition, err = srcFile.Eval()
 
 	if err != nil {
 		return nil, err

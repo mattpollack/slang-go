@@ -52,22 +52,22 @@ type SourceFile struct {
 	Definition  AST
 }
 
-func (s *SourceFile) Eval(env *Environment) (AST, error) {
+func (s *SourceFile) Eval() (AST, error) {
 	if defun := false; defun {
-		ast, err := Defun(s.Definition, env)
+		ast, err := Defun(s.Definition)
 
 		if err != nil {
 			return nil, err
 		}
 
-		fmt.Println("************")
-		Print(ast)
-		fmt.Println("************")
-
 		s.Definition = ast
 	}
 
-	return s.Definition.Eval(env)
+	//fmt.Println("************")
+	//Print(s.Definition)
+	//fmt.Println("************")
+
+	return s.Definition.Eval(NewEnv(nil))
 }
 
 func (s *SourceFile) Print() {
@@ -550,7 +550,9 @@ func (a Let) Copy() AST {
 		res.BoundValues = append(res.BoundValues, ast.Copy())
 	}
 
-	res.Body = a.Body.Copy()
+	if res.Body != nil {
+		res.Body = a.Body.Copy()
+	}
 
 	return res
 }
@@ -727,7 +729,7 @@ func (a Let) Eval(env *Environment) (AST, error) {
 	return a.Body.Eval(env)
 }
 func (a Where) Eval(*Environment) (AST, error)   { panic("TODO eval where") }
-func (a Builtin) Eval(*Environment) (AST, error) { panic("TODO eval built") }
+func (a Builtin) Eval(*Environment) (AST, error) { return a, nil }
 
 // -- APPLY -----------------------------
 

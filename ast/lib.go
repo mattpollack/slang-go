@@ -1,13 +1,21 @@
 package ast
 
-import (
-	"fmt"
-)
-
-// Protect import because I'm lazy
-var _ interface{} = fmt.Println
-
 var isLib = map[string]bool{}
+var StdLib Let
+
+func init() {
+	for _, b := range libFns {
+		isLib[b.name] = true
+	}
+
+	StdLib, _ = NewLet([]Identifier{}, []AST{}, nil)
+
+	for _, b := range libFns {
+		StdLib.Bind(Identifier{b.name}, b)
+	}
+
+	StdLib.Body = Identifier{"NO BODY"}
+}
 
 func IsBuiltin(v string) bool {
 	if _, ok := isLib[v]; ok {
@@ -15,12 +23,6 @@ func IsBuiltin(v string) bool {
 	}
 
 	return false
-}
-
-func init() {
-	for _, b := range libFns {
-		isLib[b.name] = true
-	}
 }
 
 var libFns = []Builtin{
@@ -274,12 +276,4 @@ var libFns = []Builtin{
 			return nil, NewRuntimeError(nil, "Can't find the length of non-string type")
 		},
 	},
-}
-
-var StdLib = NewEnv(nil)
-
-func init() {
-	for _, builtin := range libFns {
-		StdLib.Set(builtin.name, builtin)
-	}
 }

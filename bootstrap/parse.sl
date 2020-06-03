@@ -1,56 +1,7 @@
 package parse
 
-# NOTE: Because of the import bug
-data = {
-  .some -> { v -> [.some, v] }
-	.none -> [.none]
-}
-
-# NOTE: Because of the import bug
-std = {
-  .map ->
-    map = {
-      _ []     -> []
-      f [m:ms] -> [f m] ++ map f ms
-    }
-    map
-
-  .foldr ->
-    foldr = {
-      _ z []     -> z
-      f z [m:ms] -> f m (foldr f z ms)
-    }
-    foldr
-
-  .unfoldr ->
-    unfoldr = {
-      f z ->
-        match f z {
-          [.some, [v, s]] -> [v] ++ unfoldr f s
-                          => []
-        }
-    }
-    unfoldr
-
-  .find ->
-    find = {
-      _ []     -> data.none
-      f [m:ms] ->
-        match f m {
-          [.none] -> find f ms
-          some    -> some
-        }
-    }
-    find
-
-  .filter ->
-    filter = {
-      _ []             -> []
-      f [m:ms] : (f m) -> [m] ++ filter f ms
-      f [_:ms]         -> filter f ms
-    }
-    filter
-}
+import "bootstrap/data.sl"
+import "bootstrap/std.sl"
 
 is_char_class = {
   chars ->
@@ -152,7 +103,8 @@ tokens = std.filter {
 } (
   std.unfoldr {
     p : (p.curr.type == .end_of_file) -> data.none
-    p                                 -> data.some [p.curr, (p.next)]
+    p
+    -> data.some [p.curr, (p.next)]
   } parser
 )
 

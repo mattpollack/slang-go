@@ -50,6 +50,7 @@ unfoldl = {
 {
   .map     -> map
   .filter  -> filter
+  .find    -> find
   .foldr   -> foldr
   .foldl   -> foldl
   .unfoldr -> unfoldr
