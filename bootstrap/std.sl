@@ -12,7 +12,7 @@ filter = {
 }
 
 find = {
-  _ []     -> data.none
+  _ []     -> [.none]
   f [m:ms] ->
     match f m {
       [.none] -> find f ms
@@ -46,6 +46,27 @@ unfoldl = {
     }
 }
 
+apply = {
+  o []     -> o
+  f [m:ms] -> apply (f m) ms
+}
+
+# maybe broader interface?
+do = {
+  next ->
+    loop = {
+      []       collection args -> [.some, [collection, args]]
+      [fn:fns] collection args ->
+        match apply fn args {
+          [.none]      -> [.none]
+          [.some, out] -> match next collection out {
+            [next_collection, next_args] -> loop fns next_collection next_args
+          }
+        }
+    }
+    loop
+}
+
 # Reflection use-case
 {
   .map     -> map
@@ -55,4 +76,6 @@ unfoldl = {
   .foldl   -> foldl
   .unfoldr -> unfoldr
   .unfoldl -> unfoldl
+  .do      -> do
+  .apply   -> apply
 }
