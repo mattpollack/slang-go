@@ -6,7 +6,7 @@ Slang is a dynamically typed pure and eager functional programming language with
 
 Slang source files have the `.sl` extension, and are composed of a package name, imports, and a slang expression. 
 
-```
+```ruby
 package main
 
 import "std"
@@ -25,7 +25,7 @@ Slang has these common primitive values:
 
 Additionally slang supports recursive and non recursive binding.
 
-```
+```ruby
 # Identifiers are bound to values like so:
 # <identifier> = <expression>
 # <expression>
@@ -44,7 +44,7 @@ print "This is all you need!"
 
 Labels are static enum like values which start with `.`. Labels bind tightly when not followed by a space.
 
-```
+```ruby
 # True and false are just labels
 .true == (1 == 1)
 
@@ -58,7 +58,7 @@ print data.a
 
 Patterns open up deconstruction of these values.
 
-```
+```ruby
 add_pair = {
   [a, b] -> a + b
 }
