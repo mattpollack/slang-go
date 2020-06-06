@@ -11,8 +11,12 @@ is_char_class = {
     }
 }
 
-is_alpha = is_char_class "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-is_num = is_char_class "0123456789"
+alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+numbers = "0123456789"
+
+is_num = is_char_class numbers 
+is_alpha = is_char_class alphabet
+is_identifier = is_char_class (alphabet ++ "_")
 is_whitespace = is_char_class " \t\r\n"
 
 token_t = {
@@ -55,7 +59,7 @@ scan_word_t = {
 
 tokenizer_t =
   scanners = [
-    scan_class_t .token_identifier   is_alpha,
+    scan_class_t .token_identifier   is_identifier,
     scan_class_t .token_number       is_num,
     scan_class_t .token_whitespace   is_whitespace,
     scan_word_t  .token_arrow        "->",
@@ -128,7 +132,7 @@ scan_meta_and = {
       } scanners [] [tokenizer])
     {
       [.none]                                 -> data.none
-      [.some, [collection, [next_tokenizer]]] -> data.some [collection, next_tokenizer]
+      [.some, [collection, [next_tokenizer]]] -> data.some [next_tokenizer, collection]
     }
 }
 
@@ -147,46 +151,58 @@ scan_identifier = scan_token .token_identifier {
 }
 
 scan_number = scan_token .token_number {
-  token -> {
-    .type  -> .ast_number
-    .value -> token.val
-  }
+  token ->
+    match data.atoi (token.val) {
+      [.none]    -> data.none
+      [.some, v] -> {
+        .type  -> .ast_number
+        .value -> v
+      }
+    }
 }
-
-scan_expression = scan_meta_or [
-  scan_identifier,
-  scan_number,
-  scan_let
-]
 
 scan_let = {
   tokenizer ->
-    _ = print "TODO let"
-    data.none
+    match scan_meta_and [
+      scan_identifier,
+      scan_token .token_equals { _ -> data.none },
+      scan_expression,
+      scan_expression
+    ] tokenizer {
+      [.none] -> data.none
+      [.some, [next_tokenizer, [id, _, value, body]]] ->
+        data.some [
+          next_tokenizer,
+          {
+            .type  -> .ast_let
+            .id    -> id
+            .value -> value
+            .body  -> body
+          }
+        ]
+    }
 }
 
-# Sample source code
-source_tokenizer = tokenizer_t "abc 1  def  123 ghi
+scan_expression = scan_meta_or [
+  scan_let,
+  scan_identifier,
+  scan_number
+]
 
-fib = {
-  0 -> 1
-  1 -> 1
-  n -> fib (n - 1) + fib (n - 2)
-}
+# sample source code
+source_tokenizer = tokenizer_t "
+b = 10
+c = c
+d = abc
+e = 123454
+b"
 
-print (fib 10)"
-
-_ = match scan_meta_and [
-  scan_expression,
-  scan_expression,
-  scan_expression
-] source_tokenizer {
-  [.none]                               -> print ":("
-  [.some, [[id1, id2, id3], tokenizer]] ->
+_ = match scan_expression source_tokenizer {
+  [.none]                   -> print ":("
+  [.some, [tokenizer, ast]] ->
     _ = print "-------------"
-    _ = print (id1.value)
-    _ = print (id2.value)
-    _ = print (id3.value)
+    _ = print (ast.type)
+    _ = print (ast.body.body.body.body.value)
     _ = print "-------------"
     .nil
 }

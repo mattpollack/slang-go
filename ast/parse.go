@@ -18,7 +18,6 @@ const (
 	TOKEN_KIND_ELSE
 
 	TOKEN_KIND_IF
-	TOKEN_KIND_AS
 	TOKEN_KIND_FAT_ARROW
 	TOKEN_KIND_ARROW
 	TOKEN_KIND_OP_EQUALS
@@ -240,7 +239,6 @@ func (p *parser) Next() token {
 		"match",
 		"else",
 		"if",
-		"as",
 		"=>",
 		"->",
 		"==",
@@ -977,17 +975,16 @@ func Parse(src []byte) (*SourceFile, error) {
 
 		name := ""
 
-		if p.ConsumeIfNext(TOKEN_KIND_AS) {
-			if p.Peek().kind != TOKEN_KIND_IDENTIFIER {
-				return nil, NewParseError(nil, "Import name must be an identifier")
-			}
-
-			name = string(p.Next().value)
+		/* Import renaming removed for now
+		if p.Peek().kind == TOKEN_KIND_IDENTIFIER {
+			return nil, NewParseError(nil, "Import name must be an identifier")
 		}
+
+		name = string(p.Next().value)
 
 		if name == "_" {
 			return nil, NewParseError(nil, "Import name can't be discarded (_)")
-		}
+		}*/
 
 		file.Imports = append(file.Imports, SourceFileImport{path, name})
 	}
