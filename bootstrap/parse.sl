@@ -56,7 +56,7 @@ scan_word_t = {
 tokenizer_t =
   scanners = [
     scan_class_t .token_identifier   is_alpha,
-    scan_class_t .token_num          is_num,
+    scan_class_t .token_number       is_num,
     scan_class_t .token_whitespace   is_whitespace,
     scan_word_t  .token_arrow        "->",
 
@@ -91,17 +91,6 @@ tokenizer_t =
     src -> state (token_t "" src .start_of_file)
   }
 
-# Sample source code
-source_tokenizer = tokenizer_t "abc  def  ghi
-
-fib = {
-  0 -> 1
-  1 -> 1
-  n -> fib (n - 1) + fib (n - 2)
-}
-
-print (fib 10)"
-
 # scans a token type while skipping whitespace
 scan_token = {
   token_type construct_fn in_tokenizer ->
@@ -123,13 +112,6 @@ scan_token = {
       token : (token.type == .token_whitespace) -> scan (in_tokenizer.next)
                                                 => scan in_tokenizer
     }
-}
-
-scan_identifier = scan_token .token_identifier {
-  token -> {
-    .type  -> .ast_identifier
-    .value -> token.val
-  }
 }
 
 # scans the first of many scanners
@@ -157,14 +139,42 @@ scan_meta_many = {
     data.none
 }
 
-scan_expression = {
-  tokenizer ->
-    std.find {
-      scanner -> scanner tokenizer
-    } [
-      scan_identifier
-    ]
+scan_identifier = scan_token .token_identifier {
+  token -> {
+    .type  -> .ast_identifier
+    .value -> token.val
+  }
 }
+
+scan_number = scan_token .token_number {
+  token -> {
+    .type  -> .ast_number
+    .value -> token.val
+  }
+}
+
+scan_expression = scan_meta_or [
+  scan_identifier,
+  scan_number,
+  scan_let
+]
+
+scan_let = {
+  tokenizer ->
+    _ = print "TODO let"
+    data.none
+}
+
+# Sample source code
+source_tokenizer = tokenizer_t "abc 1  def  123 ghi
+
+fib = {
+  0 -> 1
+  1 -> 1
+  n -> fib (n - 1) + fib (n - 2)
+}
+
+print (fib 10)"
 
 _ = match scan_meta_and [
   scan_expression,
@@ -182,6 +192,7 @@ _ = match scan_meta_and [
 }
 
 print "ok"
+
 
 
 
