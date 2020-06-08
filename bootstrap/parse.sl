@@ -97,42 +97,48 @@ tokenizer_t =
 
 # scans a token type while skipping whitespace
 scan_token = {
-  token_type construct_fn in_tokenizer ->
-    scan = {
+  token_type make_fn in_tokenizer ->
+    loop = {
       tokenizer ->
         tokenizer = tokenizer.next
 
         match tokenizer.curr {
-          token : (token.type == token_type) ->
-            data.some [
-              tokenizer,
-              construct_fn token
-            ]
-          => data.none
+          token : (token.type == token_type) -> data.some [tokenizer, make_fn token]
+                                             => data.none
         }
     }
 
     match in_tokenizer.next.curr {
-      token : (token.type == .token_whitespace) -> scan (in_tokenizer.next)
-                                                => scan in_tokenizer
+      token : (token.type == .token_whitespace) -> loop (in_tokenizer.next)
+                                                => loop in_tokenizer
     }
 }
 
 # scans the first of many scanners
 scan_meta_or = {
-  scanners tokenizer -> std.find { scanner -> scanner tokenizer } scanners
+  scanners make_fn tokenizer ->
+
+    # NOTE: erroring here?
+    _ = print "------------------"
+    _ = print tokenizer
+    _ = print "------------------"
+
+    match (std.find { scanner -> scanner tokenizer } scanners) {
+      [.none]                               -> data.none
+      [.some, [collection, next_tokenizer]] -> data.some [next_tokenizer, make_fn collection]
+    }
 }
 
 # scans all of many scanners 
 scan_meta_and = {
-  scanners tokenizer ->
+  scanners make_fn tokenizer ->
     match
       (std.do {
         collection [next_tokenizer, token] -> [collection ++ [token], [next_tokenizer]]
       } scanners [] [tokenizer])
     {
       [.none]                                 -> data.none
-      [.some, [collection, [next_tokenizer]]] -> data.some [next_tokenizer, collection]
+      [.some, [collection, [next_tokenizer]]] -> data.some [next_tokenizer, make_fn collection]
     }
 }
 
@@ -143,51 +149,54 @@ scan_meta_many = {
     data.none
 }
 
-scan_identifier = scan_token .token_identifier {
-  token -> {
-    .type  -> .ast_identifier
-    .value -> token.val
-  }
-}
-
-scan_number = scan_token .token_number {
-  token ->
-    match data.atoi (token.val) {
-      [.none]    -> data.none
-      [.some, v] -> {
-        .type  -> .ast_number
-        .value -> v
+scan = {
+  type tokenizer ->
+    identifier = scan_token .token_identifier {
+      token -> {
+        .type  -> .identifier
+        .value -> token.val
       }
     }
-}
 
-scan_let = {
-  tokenizer ->
-    match scan_meta_and [
-      scan_identifier,
-      scan_token .token_equals { _ -> data.none },
-      scan_expression,
-      scan_expression
-    ] tokenizer {
-      [.none] -> data.none
-      [.some, [next_tokenizer, [id, _, value, body]]] ->
-        data.some [
-          next_tokenizer,
-          {
-            .type  -> .ast_let
-            .id    -> id
-            .value -> value
-            .body  -> body
+    number = scan_token .token_number {
+      token ->
+        match data.atoi (token.val) {
+          [.none]    -> data.none
+          [.some, v] -> {
+            .type  -> .number
+            .value -> v
           }
-        ]
+        }
+    }
+
+    let =
+      scan_meta_and [
+        scan.identifier,
+        scan_token .token_equals { _ -> data.none },
+        scan.expression,
+        scan.expression
+      ] {
+        [id, _, value, body] -> {
+          .type  -> .let
+          .id    -> id
+          .value -> value
+          .body  -> body
+        }
+      }
+
+    expression = scan_meta_or [
+      scan.let,
+      scan.identifier,
+      scan.number
+    ] { id -> id }
+
+    match type {
+      .identifier -> identifier tokenizer
+      .number     -> number tokenizer
+      .let        -> let tokenizer
+      .expression -> expression tokenizer
     }
 }
-
-scan_expression = scan_meta_or [
-  scan_let,
-  scan_identifier,
-  scan_number
-]
 
 # sample source code
 source_tokenizer = tokenizer_t "
@@ -195,14 +204,14 @@ b = 10
 c = c
 d = abc
 e = 123454
-b"
+f
+"
 
-_ = match scan_expression source_tokenizer {
+_ = match scan.expression source_tokenizer {
   [.none]                   -> print ":("
   [.some, [tokenizer, ast]] ->
     _ = print "-------------"
     _ = print (ast.type)
-    _ = print (ast.body.body.body.body.value)
     _ = print "-------------"
     .nil
 }
