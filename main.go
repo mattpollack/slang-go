@@ -59,7 +59,7 @@ func main() {
 	// Timer
 	startTime := time.Now()
 	defer func() {
-		fmt.Println("\nExecution time:", time.Now().Sub(startTime))
+		fmt.Println(" ---\n Execution time:", time.Now().Sub(startTime))
 	}()
 
 	switch len(os.Args) {

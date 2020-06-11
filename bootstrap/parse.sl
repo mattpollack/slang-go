@@ -108,6 +108,12 @@ scan_token = {
         }
     }
 
+    _ = print "-1----------------"
+    _ = print token_type
+    _ = print make_fn
+    _ = print in_tokenizer
+    _ = print "------------------"
+
     match in_tokenizer.next.curr {
       token : (token.type == .token_whitespace) -> loop (in_tokenizer.next)
                                                 => loop in_tokenizer
@@ -119,7 +125,10 @@ scan_meta_or = {
   scanners make_fn tokenizer ->
 
     # NOTE: erroring here?
-    _ = print "------------------"
+
+    _ = print "-2----------------"
+    _ = print scanners
+    _ = print make_fn
     _ = print tokenizer
     _ = print "------------------"
 
@@ -132,6 +141,11 @@ scan_meta_or = {
 # scans all of many scanners 
 scan_meta_and = {
   scanners make_fn tokenizer ->
+          _ = print "-4-------------------"
+          _ = print scanners
+          _ = print make_fn
+          _ = print tokenizer
+          _ = print "---------------------"
     match
       (std.do {
         collection [next_tokenizer, token] -> [collection ++ [token], [next_tokenizer]]
@@ -169,7 +183,7 @@ scan = {
         }
     }
 
-    let =
+    let = 
       scan_meta_and [
         scan.identifier,
         scan_token .token_equals { _ -> data.none },
@@ -199,15 +213,13 @@ scan = {
 }
 
 # sample source code
-source_tokenizer = tokenizer_t "
-b = 10
-c = c
-d = abc
-e = 123454
-f
-"
+source_tokenizer = tokenizer_t (
+  "c = c" ++
+  "e = 123454" ++
+  "f"
+)
 
-_ = match scan.expression source_tokenizer {
+_ = match scan.let source_tokenizer {
   [.none]                   -> print ":("
   [.some, [tokenizer, ast]] ->
     _ = print "-------------"

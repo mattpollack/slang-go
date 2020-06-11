@@ -742,11 +742,6 @@ func (a String) Apply(b AST) (AST, error) {
 	return nil, NewRuntimeError(nil, "Cannot apply value to string")
 }
 func (a List) Apply(b AST) (AST, error)            {
-	fmt.Println("------------")
-	Print(a)
-	Print(b)
-	fmt.Println("------------")
-
 	return nil, NewRuntimeError(nil, "Cannot apply value to list")
 }
 func (a ListConstructor) Apply(b AST) (AST, error) { panic("TODO apply list con") }
