@@ -115,7 +115,7 @@ scan_token = {
 }
 
 # scans the first of many scanners
-scan_meta_or = {
+scan_or = {
   scanners make_fn tokenizer ->
     match (std.find { scanner -> scanner tokenizer } scanners) {
       [.none]                               -> data.none
@@ -124,7 +124,7 @@ scan_meta_or = {
 }
 
 # scans all of many scanners 
-scan_meta_and = {
+scan_and = {
   scanners make_fn tokenizer ->
     match
       (std.do {
@@ -137,7 +137,7 @@ scan_meta_and = {
 }
 
 # scans many of one scanner
-scan_meta_many = {
+scan_many = {
   scanner make_fn in_tokenizer ->
     loop = {
       tokenizer -> match scanner tokenizer {
@@ -175,9 +175,9 @@ scan = {
     }
 
     let = 
-      scan_meta_and [
+      scan_and [
         scan.identifier,
-        scan_token .token_equals { _ -> data.none },
+        scan_token .token_equals { id -> id },
         scan.expression,
         scan.expression
       ] {
@@ -190,10 +190,10 @@ scan = {
       }
 
     application =
-      scan_meta_and [
-        scan_token .token_paren_open { _ -> data.none },
-        scan_meta_many (scan.expression) { id -> id },
-        scan_token .token_paren_close { _ -> data.none }
+      scan_and [
+        scan_token .token_paren_open { id -> id },
+        scan_many (scan.expression) { id -> id },
+        scan_token .token_paren_close { id -> id }
       ] {
         [_, body, _] -> {
           .type -> .application
@@ -201,9 +201,38 @@ scan = {
         }
       }
 
-    expression = scan_meta_or [
+    pattern =
+      scan_and [
+        scan_token .token_brace_open { id -> id },
+        scan_many (scan_and [
+          scan_many (scan.match) { id -> id },
+          scan_token .token_arrow { id -> id },
+          scan.expression
+        ] {
+          [_matches, _, body] -> {
+            .type    -> .match
+            .matches -> _matches
+            .body    -> body
+          }
+        }) { id -> id },
+        scan_token .token_brace_close { id -> id }
+      ] {
+        [_, _matchGroups, _] -> {
+          .type        -> .pattern
+          .matchGroups -> _matchGroups
+        }
+      }
+
+    expression = scan_or [
+      scan.pattern,
       scan.application,
       scan.let,
+      scan.identifier,
+      scan.number
+    ] { id -> id }
+
+    # NOTE: unfortunate naming overload
+    _match = scan_or [
       scan.identifier,
       scan.number
     ] { id -> id }
@@ -214,21 +243,30 @@ scan = {
       .let         -> let tokenizer
       .expression  -> expression tokenizer
       .application -> application tokenizer
+      .match       -> _match tokenizer
+      .pattern     -> pattern tokenizer
     }
 }
 
 # sample source code
 source_tokenizer = tokenizer_t (
-  "c = 1            \n" ++
-  "e = (c plus 4)   \n" ++
-  "f                \n"
+  std.foldr {
+    str line -> str ++ "\n" ++ line
+  } "" [
+    "fib = {                                           ",
+    "  0 -> 1                                          ",
+    "  1 -> 1                                          ",
+    "  n -> (plus (fib (minus n 1)) (fib (minus n 2))) ",
+    "}                                                 ",
+    "print (fib 5)                                     "
+  ]
 )
 
 _ = match scan.expression source_tokenizer {
   [.none]                   -> print ":("
   [.some, [tokenizer, ast]] ->
     _ = print "-------------"
-    _ = print (ast.body.value.body)
+    _ = print (ast)
     _ = print "-------------"
     .nil
 }
