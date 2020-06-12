@@ -55,12 +55,12 @@ apply = {
 do = {
   next ->
     loop = {
-      []       collection args -> [.some, [collection, args]]
+      []       collection args -> [.some, [args, collection]]
       [fn:fns] collection args ->
         match apply fn args {
           [.none]      -> [.none]
           [.some, out] -> match next collection out {
-            [next_collection, next_args] -> loop fns next_collection next_args
+            [next_args, next_collection] -> loop fns next_collection next_args
           }
         }
     }
