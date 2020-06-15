@@ -1,10 +1,17 @@
 package sketch
 
-test = {
-  a b c ->
-    _ = "oops"
-    
+scanners = module {
+  or = {
+    id -> id
+  }
+  and = {
+    id -> id
+  }
+  many = {
+    id -> id
+  }
 }
 
+_ = print scanners
 
-print "ok"
+print (scanners.or "derp")

@@ -14,6 +14,7 @@ const (
 	// Reserved sorted by length
 	TOKEN_KIND_PACKAGE
 	TOKEN_KIND_IMPORT
+	TOKEN_KIND_MODULE
 	TOKEN_KIND_MATCH
 	TOKEN_KIND_ELSE
 
@@ -254,6 +255,7 @@ func (p *parser) Next() token {
 	for i, s := range []string{
 		"package",
 		"import",
+		"module",
 		"match",
 		"else",
 		"if",
@@ -439,6 +441,56 @@ func (p *parser) Identifier() (AST, error) {
 	}
 
 	return nil, errors.New("Cannot parse identifier")
+}
+
+func (p *parser) Module() (AST, error) {
+	if !p.ConsumeIfNext(TOKEN_KIND_MODULE) {
+		return nil, NewParseError(p, nil, "Module must begin with 'module'")
+	}
+
+	if !p.ConsumeIfNext(TOKEN_KIND_BRACE_OPEN) {
+		return nil, NewParseError(p, nil, "Module must be surrounded by braces")
+	}
+
+	boundIds := []Identifier{}
+	boundValues := []AST{}
+
+	for !p.ConsumeIfNext(TOKEN_KIND_BRACE_CLOSE) {
+		id, err := p.Identifier()
+
+		if err != nil {
+			return nil, NewParseError(p, err, "Failed to parse bound id in module")
+		}
+
+		if !p.ConsumeIfNext(TOKEN_KIND_EQUAL) {
+			return nil, NewParseError(p, nil, "Bound id in module must be followed by '='")
+		}
+
+		value, err := p.Expression([]int{})
+
+		if err != nil {
+			return nil, NewParseError(p, err, "Failed to parse bound value in module")
+		}
+
+		boundIds = append(boundIds, id.(Identifier))
+		boundValues = append(boundValues, value)
+	}
+
+	if len(boundIds) == 0 {
+		return nil, NewParseError(p, nil, "Module must have at least one bound value")
+	}
+
+	matchGroups := [][]AST{}
+	bodies := []AST{}
+
+	for _, id := range boundIds {
+		matchGroups = append(matchGroups, []AST{Label{id.Value}})
+		bodies = append(bodies, id)
+	}
+
+	body, _ := NewPattern(matchGroups, bodies)
+
+	return NewLet(boundIds, boundValues, body)
 }
 
 func (p *parser) Label() (AST, error) {
@@ -798,6 +850,10 @@ func (p *parser) PrimaryExpr(endTokenKinds []int) (AST, error) {
 		} else {
 			return id, nil
 		}
+	}
+
+	if p.Peek().kind == TOKEN_KIND_MODULE {
+		return p.Module()
 	}
 
 	if p.Peek().kind == TOKEN_KIND_LABEL {
