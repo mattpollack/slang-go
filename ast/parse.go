@@ -137,7 +137,7 @@ func NewParseError(p *parser, wrapped error, err string) *ParseError {
 		message += fmt.Sprintf("| %s\n", string(p.savedLines[i]))
 	}
 
-	message += pad(p.char+1) + "^"
+	message += padStr + pad(p.char) + "^"
 	message += "\n"+padStr
 	message += fmt.Sprintf("ERROR: %s\n", err)
 
