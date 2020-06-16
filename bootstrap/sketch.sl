@@ -1,6 +1,6 @@
 package sketch
 
-scanners = module {
+scanners = module tokenizer {
   or = {
     id -> id
   }
@@ -12,6 +12,4 @@ scanners = module {
   }
 }
 
-_ = print scanners
-
-print (scanners.or "derp")
+print scanners

@@ -158,9 +158,7 @@ scan_many = {
     }
 }
 
-# NOTE: use a lazy module somehow?
-scan = {
-  type tokenizer ->
+scan = module tokenizer {
     identifier =
       scan_token .token_identifier {
         token -> {
@@ -259,18 +257,9 @@ scan = {
         scan.number,
         scan.list
       ] { id -> id }
-
-    match type {
-      .identifier  -> identifier
-      .number      -> number
-      .let         -> let
-      .expression  -> expression
-      .application -> application
-      .pattern     -> pattern
-      .pmatch      -> pmatch
-      .list        -> list
-    } tokenizer
 }
+
+_ = print scan
 
 # sample source code
 source_tokenizer = tokenizer_t (

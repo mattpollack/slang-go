@@ -448,6 +448,18 @@ func (p *parser) Module() (AST, error) {
 		return nil, NewParseError(p, nil, "Module must begin with 'module'")
 	}
 
+	params := []AST{}
+
+	for p.Peek().kind != TOKEN_KIND_BRACE_OPEN {
+		id, err := p.Identifier()
+
+		if err != nil {
+			return nil, NewParseError(p, err, "Failed to parse parameter id in module")
+		}
+
+		params = append(params, id)
+	}
+
 	if !p.ConsumeIfNext(TOKEN_KIND_BRACE_OPEN) {
 		return nil, NewParseError(p, nil, "Module must be surrounded by braces")
 	}
@@ -489,8 +501,27 @@ func (p *parser) Module() (AST, error) {
 	}
 
 	body, _ := NewPattern(matchGroups, bodies)
+	let, _ := NewLet(boundIds, boundValues, body)
 
-	return NewLet(boundIds, boundValues, body)
+	// Generate params pattern and let
+	if len(params) > 0 {
+		uniqueMatch := []AST{}
+		uniqueIds := []Identifier{}
+		moduleId := NextUniqueId()
+		
+		for _, param := range params {
+			uid := NextUniqueId()
+			uniqueMatch = append(uniqueMatch, uid)
+			uniqueIds = append(uniqueIds, param.(Identifier))
+		}
+
+		paramLet, _ := NewLet(uniqueIds, uniqueMatch, Application{append([]AST{let, moduleId}, uniqueMatch...)})
+		paramPattern, _ := NewPattern([][]AST{append([]AST{moduleId}, uniqueMatch...)}, []AST{paramLet})
+		
+		return paramPattern, nil
+	} else {
+		return let, nil
+	}
 }
 
 func (p *parser) Label() (AST, error) {
