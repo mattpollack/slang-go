@@ -52,7 +52,6 @@ module {
     f [m:ms] -> apply (f m) ms
   }
 
-  # maybe broader interface?
   do = {
     next ->
       loop = {

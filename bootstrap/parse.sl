@@ -159,107 +159,104 @@ scan_many = {
 }
 
 scan = module tokenizer {
-    identifier =
-      scan_token .token_identifier {
-        token -> {
-          .type  -> .identifier
-          .value -> token.val
-        }
+  identifier =
+    scan_token .token_identifier {
+      token -> {
+        .type  -> .identifier
+        .value -> token.val
       }
+    }
 
-    number =
-      scan_token .token_number {
-        token ->
-          match data.atoi (token.val) {
-            [.none]    -> data.none
-            [.some, v] -> {
-              .type  -> .number
-              .value -> v
-            }
+  number =
+    scan_token .token_number {
+      token ->
+        match data.atoi (token.val) {
+          [.none]    -> data.none
+          [.some, v] -> {
+            .type  -> .number
+            .value -> v
           }
-      }
-
-    let = 
-      scan_and [
-        scan.identifier,
-        scan_token .token_equals { id -> id },
-        scan.expression,
-        scan.expression
-      ] {
-        [id, _, value, body] -> {
-          .type  -> .let
-          .id    -> id
-          .value -> value
-          .body  -> body
         }
-      }
+    }
 
-    application =
-      scan_and [
-        scan_token .token_paren_open { id -> id },
-        scan_many (scan.expression) { id -> id },
-        scan_token .token_paren_close { id -> id }
-      ] {
-        [_, body, _] -> {
-          .type -> .application
-          .body -> body
-        }
+  let = 
+    scan_and [
+      scan.identifier,
+      scan_token .token_equals { id -> id },
+      scan.expression,
+      scan.expression
+    ] {
+      [id, _, value, body] -> {
+        .type  -> .let
+        .id    -> id
+        .value -> value
+        .body  -> body
       }
+    }
 
-    pattern =
-      scan_and [
-        scan_token .token_brace_open { id -> id },
-        scan_many (
-          scan_and [
-            scan_many (scan.pmatch) { id -> id },
-            scan_token .token_arrow { id -> id },
-            scan.expression
-          ] {
-            [_matches, _, body] -> {
-              .type    -> .match
-              .matches -> _matches
-              .body    -> body
-            }
+  application =
+    scan_and [
+      scan_token .token_paren_open { id -> id },
+      scan_many (scan.expression) { id -> id },
+      scan_token .token_paren_close { id -> id }
+    ] {
+      [_, body, _] -> {
+        .type -> .application
+        .body -> body
+      }
+    }
+
+  pattern =
+    scan_and [
+      scan_token .token_brace_open { id -> id },
+      scan_many (
+        scan_and [
+          scan_many (scan.pmatch) { id -> id },
+          scan_token .token_arrow { id -> id },
+          scan.expression
+        ] {
+          [_matches, _, body] -> {
+            .type    -> .match
+            .matches -> _matches
+            .body    -> body
           }
-        ) { id -> id },
-        scan_token .token_brace_close { id -> id }
-      ] {
-        [_, _matchGroups, _] -> {
-          .type        -> .pattern
-          .matchGroups -> _matchGroups
         }
+      ) { id -> id },
+      scan_token .token_brace_close { id -> id }
+    ] {
+      [_, _matchGroups, _] -> {
+        .type        -> .pattern
+        .matchGroups -> _matchGroups
       }
+    }
 
-    list =
-      scan_and [
-        scan_token .token_bracket_open { id -> id },
-        scan_token .token_bracket_close { id -> id }
-      ] {
-        _ ->
-          _ = print "TODO: parse list"
-          data.none
-      }
+  pmatch =
+    scan_or [
+      scan.identifier,
+      scan.number,
+      scan.list
+    ] { id -> id }
 
-    expression =
-      scan_or [
-        scan.pattern,
-        scan.application,
-        scan.list,
-        scan.let,
-        scan.identifier,
-        scan.number
-      ] { id -> id }
+  list =
+    scan_and [
+      scan_token .token_bracket_open { id -> id },
+      scan_token .token_bracket_close { id -> id }
+    ] {
+      _ ->
+        _ = print "TODO: parse list"
+        data.none
+    }
 
-    # NOTE: unfortunate naming overload
-    pmatch =
-      scan_or [
-        scan.identifier,
-        scan.number,
-        scan.list
-      ] { id -> id }
+  expression =
+    scan_or [
+      scan.pattern,
+      scan.application,
+      scan.list,
+      scan.let,
+      scan.identifier,
+      scan.number
+    ] { id -> id }
 }
-
-_ = print scan
 
 # sample source code
 source_tokenizer = tokenizer_t (
@@ -272,8 +269,7 @@ source_tokenizer = tokenizer_t (
     "  1 -> 1                                          ",
     "  n -> (plus (fib (minus n 1)) (fib (minus n 2))) ",
     "}                                                 ",
-    "_ = [1, (a b c), 2]                               ",
-    "print (fib 5)                                     "
+    "(print (fib 5))                                   "
   ]
 )
 

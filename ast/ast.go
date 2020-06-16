@@ -61,11 +61,11 @@ func (s *SourceFile) Eval() (AST, error) {
 		}
 
 		s.Definition = ast
-	}
 
-	//fmt.Println("************")
-	//Print(s.Definition)
-	//fmt.Println("************")
+		fmt.Println("************")
+		Print(s.Definition)
+		fmt.Println("************")
+	}
 
 	return s.Definition.Eval(NewEnv(nil))
 }

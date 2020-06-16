@@ -508,7 +508,7 @@ func (p *parser) Module() (AST, error) {
 		uniqueMatch := []AST{}
 		uniqueIds := []Identifier{}
 		moduleId := NextUniqueId()
-		
+
 		for _, param := range params {
 			uid := NextUniqueId()
 			uniqueMatch = append(uniqueMatch, uid)
@@ -517,7 +517,7 @@ func (p *parser) Module() (AST, error) {
 
 		paramLet, _ := NewLet(uniqueIds, uniqueMatch, Application{append([]AST{let, moduleId}, uniqueMatch...)})
 		paramPattern, _ := NewPattern([][]AST{append([]AST{moduleId}, uniqueMatch...)}, []AST{paramLet})
-		
+
 		return paramPattern, nil
 	} else {
 		return let, nil
